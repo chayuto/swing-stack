@@ -13,8 +13,9 @@ Rails 8.1 API + React dashboard for golf launch monitor telemetry.
 
 ## Conventions
 
-- Backend: `bundle exec rspec`, `bin/rubocop`, `bin/brakeman` must pass.
-- Frontend lives in `web/` (Vite + React + TS). E2E tests: `npx playwright test` from `web/`.
+- CI must pass. Before pushing, run everything CI runs: `bundle exec rspec`, `bin/rubocop`, `bin/brakeman`, `bin/bundler-audit`, and from `web/`: `npm run lint` and `npm run build`.
+- N+1 queries: Bullet raises in test. Any endpoint that serializes a collection must eager-load its associations (`includes`) or aggregate in SQL.
+- Frontend lives in `web/` (Vite + React + TS). E2E tests: `npx playwright test` from `web/`. They need a seeded dev DB, so they run locally, not in CI.
 - Test ids: kebab-case `data-testid` on chart marks and stat values. Use role-based locators for buttons and forms.
 - `data/` and `docs/personal/` are gitignored. Never commit launch monitor exports (they contain player names and emails).
 - Never add co-author lines to commits.

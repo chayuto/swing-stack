@@ -1,5 +1,7 @@
 # Swing-Stack
 
+[![CI](https://github.com/chayuto/swing-stack/actions/workflows/ci.yml/badge.svg)](https://github.com/chayuto/swing-stack/actions/workflows/ci.yml)
+
 Store your golf launch monitor data. See it as charts. Query it from an API.
 
 <picture>

@@ -4,6 +4,16 @@ updates:
   directory: "/"
   schedule:
     interval: weekly
+  # Let gem releases settle for 30 days before proposing them.
+  cooldown:
+    default-days: 30
+  open-pull-requests-limit: 10
+- package-ecosystem: npm
+  directory: "/web"
+  schedule:
+    interval: weekly
+  cooldown:
+    default-days: 30
   open-pull-requests-limit: 10
 - package-ecosystem: github-actions
   directory: "/"

@@ -45,6 +45,9 @@ group :development, :test do
   gem "rspec-rails"
   gem "factory_bot_rails"
 
+  # Detects N+1 queries and unused eager loading. Raises in test.
+  gem "bullet"
+
   # Audits gems for known security defects (use config/bundler-audit.yml to ignore issues)
   gem "bundler-audit", require: false
 

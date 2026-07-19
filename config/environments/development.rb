@@ -3,6 +3,12 @@ require "active_support/core_ext/integer/time"
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
+  # Log N+1 queries and unused eager loading.
+  config.after_initialize do
+    Bullet.enable = true
+    Bullet.rails_logger = true
+  end
+
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
 

@@ -6,6 +6,12 @@
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
+  # Fail the suite on N+1 queries and unused eager loading.
+  config.after_initialize do
+    Bullet.enable = true
+    Bullet.raise = true
+  end
+
   # While tests run files are not watched, reloading is not necessary.
   config.enable_reloading = false
 
