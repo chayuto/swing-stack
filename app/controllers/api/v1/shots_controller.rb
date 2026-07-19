@@ -13,9 +13,10 @@ module Api
         per_page = [ params.fetch(:per_page, 100).to_i, MAX_PER_PAGE ].min
         page = [ params.fetch(:page, 1).to_i, 1 ].max
         total = shots.count
+        with_trajectory = params[:include].to_s.split(",").include?("trajectory")
 
         render json: {
-          shots: shots.offset((page - 1) * per_page).limit(per_page).map { |s| serialize(s) },
+          shots: shots.offset((page - 1) * per_page).limit(per_page).map { |s| serialize(s, with_trajectory:) },
           page: page,
           per_page: per_page,
           total: total
@@ -24,8 +25,10 @@ module Api
 
       private
 
-      def serialize(shot)
-        shot.as_json(only: %i[id external_id training_session_id struck_at reduced_accuracy] + Shot::TELEMETRY.map(&:to_sym))
+      def serialize(shot, with_trajectory: false)
+        columns = %i[id external_id training_session_id struck_at reduced_accuracy] + Shot::TELEMETRY.map(&:to_sym)
+        columns << :ball_trajectory if with_trajectory
+        shot.as_json(only: columns)
             .merge(club: shot.club && { id: shot.club.id, label: shot.club.label })
       end
     end
