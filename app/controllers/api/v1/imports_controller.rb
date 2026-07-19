@@ -33,7 +33,7 @@ module Api
       end
 
       def serialize(batch)
-        batch.as_json(only: %i[id status source sessions_count shots_count error_message processed_at created_at])
+        batch.as_json(only: %i[id status source filename sessions_count shots_count error_message processed_at created_at])
       end
     end
   end

@@ -1,20 +1,15 @@
-# Idempotent demo seed: a demo user plus every launch monitor export
-# found in data/*.json (real TrackMan multiGroupReport exports,
-# gitignored), with human labels attached to the club fingerprints.
+# Idempotent demo seed: a demo user, telemetry ingested from data/*.json
+# (real TrackMan multiGroupReport exports, gitignored), and human labels
+# for the club fingerprints. Ingest is checksum-tracked, so re-running
+# only parses exports that are new since the last run.
 user = User.find_or_create_by!(email: "demo@swing-stack.dev") do |u|
   u.password = ENV.fetch("DEMO_PASSWORD", "demo-password-123")
   u.name = "Demo Player"
 end
 
-exports = Rails.root.glob("data/*.json").sort
-if exports.any?
-  exports.each do |path|
-    result = Trackman::Importer.new(user: user, payload: JSON.parse(path.read)).call
-    puts "#{path.basename}: #{result.sessions_count} session(s), #{result.shots_count} shot(s)"
-  end
-else
-  puts "No data/*.json exports found — skipping telemetry seed"
-end
+results = Trackman::FileIngest.new(user: user, dir: Rails.root.join("data")).call
+results.each { |r| puts r.to_line }
+puts "No data/*.json exports found — skipping telemetry seed" if results.empty?
 
 # Attach human labels to the loft fingerprints (only while still unlabelled).
 { 10.5 => "Driver", 31.0 => "7 Iron", 35.5 => "8 Iron", 39.0 => "9 Iron", 54.0 => "Sand Wedge" }.each do |loft, label|

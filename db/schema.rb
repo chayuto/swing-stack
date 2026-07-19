@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_062222) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_153430) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -42,6 +42,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_062222) do
   create_table "import_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "error_message"
+    t.string "file_checksum"
+    t.string "filename"
     t.datetime "processed_at"
     t.jsonb "raw_payload", null: false
     t.integer "sessions_count", default: 0, null: false
@@ -51,6 +53,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_062222) do
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.index ["user_id", "created_at"], name: "index_import_batches_on_user_id_and_created_at"
+    t.index ["user_id", "file_checksum"], name: "index_import_batches_on_user_and_checksum", unique: true, where: "(file_checksum IS NOT NULL)"
     t.index ["user_id"], name: "index_import_batches_on_user_id"
   end
 

@@ -47,8 +47,11 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Drop your TrackMan report exports into `data/` and re-run `bin/rails db:seed`.
-Re-seeding never duplicates shots.
+Drop your TrackMan report exports into `data/` and run
+`bin/rails trackman:ingest`. Files are tracked by checksum in
+`import_batches`, so only new exports are parsed. Ingesting never
+duplicates shots, and the task flags any club loft that still needs a
+label. `db:seed` bootstraps a fresh database the same way.
 
 `docker compose up --build` starts the API and PostgreSQL in one command.
 
