@@ -35,5 +35,56 @@ RSpec.describe "Shots", type: :request do
 
       expect(response.parsed_body["total"]).to eq(8)
     end
+
+    it "filters by minimum carry" do
+      get "/api/v1/shots", params: { min_carry: 60 },
+                           headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      body = response.parsed_body
+      expect(body["total"]).to be < 52
+      expect(body["shots"]).to all(satisfy { |s| s["carry"] >= 60 })
+    end
+
+    it "filters by exclusion state" do
+      Shot.for_user(user).first.update!(excluded: true)
+      get "/api/v1/shots", params: { excluded: "false" },
+                           headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      expect(response.parsed_body["total"]).to eq(51)
+    end
+  end
+
+  describe "PATCH /api/v1/shots/:id" do
+    let(:shot) { Shot.for_user(user).first }
+
+    it "toggles the exclusion flag for the owner" do
+      patch "/api/v1/shots/#{shot.id}", params: { excluded: true }, headers: jwt_headers(user)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["excluded"]).to be(true)
+      expect(shot.reload.excluded).to be(true)
+    end
+
+    it "allows a write-scoped agent" do
+      patch "/api/v1/shots/#{shot.id}", params: { excluded: true },
+                                        headers: api_key_headers(user, scopes: %w[telemetry:write])
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "rejects a read-only agent key" do
+      patch "/api/v1/shots/#{shot.id}", params: { excluded: true },
+                                        headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body["required_scope"]).to eq("telemetry:write")
+    end
+
+    it "cannot touch another user's shot" do
+      stranger = create(:user)
+      patch "/api/v1/shots/#{shot.id}", params: { excluded: true }, headers: jwt_headers(stranger)
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 end

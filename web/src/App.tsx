@@ -11,6 +11,7 @@ import { RangeFan } from './components/RangeFan'
 import type { FanShot } from './components/RangeFan'
 import { TrajectoryChart } from './components/TrajectoryChart'
 import { GappingChart } from './components/GappingChart'
+import { ShotShapeChart } from './components/ShotShapeChart'
 import { ClubTable } from './components/ClubTable'
 import { LoginPanel } from './components/LoginPanel'
 
@@ -45,7 +46,13 @@ function useThemeMode(): [Mode, ThemePref, () => void] {
 
 const UNCLASSIFIED_KEY = 'unclassified'
 
-function Dashboard({ data, mode }: { data: DashboardData; mode: Mode }) {
+interface DashboardProps {
+  data: DashboardData
+  mode: Mode
+  onToggleShot: (id: string, excluded: boolean) => void
+}
+
+function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
   const [sessionId, setSessionId] = useState('all')
   const [activeClubs, setActiveClubs] = useState<Set<string> | null>(null)
   const [metric, setMetric] = useState<'carry' | 'total'>('carry')
@@ -122,6 +129,11 @@ function Dashboard({ data, mode }: { data: DashboardData; mode: Mode }) {
     [enriched, sessionId, activeClubs],
   )
 
+  // Excluded shots stay visible (hollow dots) so they can be restored,
+  // but every stat and aggregate chart ignores them.
+  const analyzed = useMemo(() => filtered.filter((s) => !s.excluded), [filtered])
+  const excludedCount = filtered.length - analyzed.length
+
   return (
     <>
       <FilterBar
@@ -134,12 +146,19 @@ function Dashboard({ data, mode }: { data: DashboardData; mode: Mode }) {
         metric={metric}
         onMetricChange={setMetric}
       />
-      <StatTiles shots={filtered} />
+      <StatTiles shots={analyzed} />
       <div className="dashboard-grid">
         <section className="card" aria-label="Shot dispersion">
           <h2>Dispersion</h2>
-          <p className="subtitle">Top-down view from the tee. Dashed ellipses are 1σ per club.</p>
-          <RangeFan shots={filtered} metric={metric} mode={mode} />
+          <p className="subtitle">
+            Top-down view from the tee. Dashed ellipses are 1σ per club.
+            {excludedCount > 0 && (
+              <span className="excluded-note" data-testid="excluded-note">
+                {' '}{excludedCount} excluded (hollow dots). Click one to restore it.
+              </span>
+            )}
+          </p>
+          <RangeFan shots={filtered} metric={metric} mode={mode} onToggle={onToggleShot} />
           <div className="fan-legend" data-testid="fan-legend">
             {chips
               .filter((c) => activeClubs === null || activeClubs.has(c.key))
@@ -155,15 +174,24 @@ function Dashboard({ data, mode }: { data: DashboardData; mode: Mode }) {
           <section className="card" aria-label="Ball flight">
             <h2>Ball flight</h2>
             <p className="subtitle">Side view of every recorded trajectory. Hover to isolate a shot.</p>
-            <TrajectoryChart shots={filtered} mode={mode} />
+            <TrajectoryChart shots={analyzed} mode={mode} />
           </section>
           <section className="card" aria-label="Carry gapping">
             <h2>Gapping</h2>
             <p className="subtitle">Carry per club: every shot, mean, and ±1σ band.</p>
-            <GappingChart shots={filtered} mode={mode} />
+            <GappingChart shots={analyzed} mode={mode} />
           </section>
         </div>
       </div>
+      <section className="card shape-card" aria-label="Shot shape">
+        <h2>Shot shape</h2>
+        <p className="subtitle">
+          Face angle vs club path at impact. Click a dot to exclude a mishit from every stat.
+        </p>
+        <div className="shape-chart">
+          <ShotShapeChart shots={filtered} mode={mode} onToggle={onToggleShot} />
+        </div>
+      </section>
       <section className="card table-card" aria-label="Club averages">
         <h2>Club averages</h2>
         <p className="subtitle">All sessions, aggregated in PostgreSQL via /api/v1/stats/clubs.</p>
@@ -175,7 +203,7 @@ function Dashboard({ data, mode }: { data: DashboardData; mode: Mode }) {
 
 export default function App() {
   const [mode, themePref, cycleTheme] = useThemeMode()
-  const { state, submitLogin, signOut } = useDashboardData()
+  const { state, submitLogin, signOut, setExcluded } = useDashboardData()
 
   return (
     <>
@@ -218,7 +246,9 @@ export default function App() {
           <span>Could not load telemetry: {state.message}</span>
         </div>
       )}
-      {state.phase === 'ready' && <Dashboard data={state.data} mode={mode} />}
+      {state.phase === 'ready' && (
+        <Dashboard data={state.data} mode={mode} onToggleShot={setExcluded} />
+      )}
 
       <footer className="app-footer">
         Distances in metres, speeds in km/h, SI units in the API. Data ingested from TrackMan

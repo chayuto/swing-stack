@@ -26,6 +26,7 @@ export function ClubTable({ stats, colorOf }: Props) {
           <th scope="col">Carry</th>
           <th scope="col">Carry SD</th>
           <th scope="col">Side SD</th>
+          <th scope="col">Face SD</th>
           <th scope="col">Total</th>
           <th scope="col">Ball km/h</th>
           <th scope="col">Club km/h</th>
@@ -48,6 +49,7 @@ export function ClubTable({ stats, colorOf }: Props) {
             <td>{fmt(r.averages.carry, 1, ' m')}</td>
             <td>{fmt(r.dispersion.carry_sd, 1, ' m')}</td>
             <td>{fmt(r.dispersion.side_sd, 1, ' m')}</td>
+            <td>{fmt(r.dispersion.face_angle_sd, 1, '°')}</td>
             <td>{fmt(r.averages.total_distance, 1, ' m')}</td>
             <td>{kmh(r.averages.ball_speed)}</td>
             <td>{kmh(r.averages.club_speed)}</td>

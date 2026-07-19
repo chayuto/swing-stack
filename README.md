@@ -14,6 +14,8 @@ Store your golf launch monitor data. See it as charts. Query it from an API.
 - **Dispersion fan.** Top-down view of every shot from the tee, with a 1-sigma ellipse per club.
 - **Ball flight.** Side view of every recorded trajectory. Hover to isolate a shot.
 - **Gapping.** Carry per club: every shot, the mean, and the spread.
+- **Shot shape.** Face angle against club path, so you can see a hook or slice
+  pattern building. Click a dot to exclude a mishit from every stat.
 - **Club averages.** Speed, smash, spin, apex, and dispersion, computed in the database.
 - **An API for everything.** The dashboard is just a client. Scripts and AI agents get their own scoped keys.
 
@@ -66,17 +68,20 @@ same file twice changes nothing.
 
 ## API
 
-| Endpoint | Purpose |
-|---|---|
-| `POST /api/v1/auth/login` | Sign in, get tokens |
-| `POST /api/v1/api_tokens` | Create a scoped agent key |
-| `POST /api/v1/imports` | Upload an export (async) |
-| `GET /api/v1/shots` | Shot telemetry, 30+ metrics each |
-| `GET /api/v1/sessions` | Practice sessions |
-| `GET /api/v1/clubs` | Clubs and labels |
-| `GET /api/v1/stats/clubs` | Per-club averages and dispersion |
+| Endpoint | Purpose | Useful params |
+|---|---|---|
+| `POST /api/v1/auth/login` | Sign in, get tokens | |
+| `POST /api/v1/api_tokens` | Create a scoped agent key | `name`, `scopes`, `ttl_seconds` |
+| `POST /api/v1/imports` | Upload an export (async) | raw TrackMan JSON body |
+| `GET /api/v1/shots` | Shot telemetry, 30+ metrics each | `session_id`, `club_id`, `min_carry`, `excluded`, `include=trajectory`, `page`, `per_page` |
+| `PATCH /api/v1/shots/:id` | Flag a shot out of analysis | `excluded` |
+| `GET /api/v1/sessions` | Practice sessions | |
+| `GET /api/v1/clubs` | Clubs and labels | |
+| `GET /api/v1/stats/clubs` | Per-club averages and dispersion | `session_id`, `min_carry` |
 
 Humans send `Authorization: Bearer <jwt>`. Agents send `X-Api-Key`.
+The full machine-readable description lives at `GET /api/v1/openapi.json`,
+so an agent can discover the surface without reading the source.
 
 ## Tests
 

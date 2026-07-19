@@ -56,5 +56,32 @@ export function useDashboardData() {
     setState({ phase: 'login', error: null })
   }, [])
 
-  return { state, submitLogin, signOut, reload: load }
+  // Optimistic: flip the flag locally, persist, then refresh the club
+  // aggregates (the server recomputes them without excluded shots).
+  const setExcluded = useCallback((id: string, excluded: boolean) => {
+    const patch = (value: boolean) =>
+      setState((prev) =>
+        prev.phase === 'ready'
+          ? {
+              ...prev,
+              data: {
+                ...prev.data,
+                shots: prev.data.shots.map((s) => (s.id === id ? { ...s, excluded: value } : s)),
+              },
+            }
+          : prev,
+      )
+    patch(excluded)
+    void api
+      .setShotExcluded(id, excluded)
+      .then(() => api.clubStats())
+      .then((stats) =>
+        setState((prev) =>
+          prev.phase === 'ready' ? { ...prev, data: { ...prev.data, stats } } : prev,
+        ),
+      )
+      .catch(() => patch(!excluded))
+  }, [])
+
+  return { state, submitLogin, signOut, setExcluded, reload: load }
 }

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_000008) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_062222) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -78,6 +78,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_000008) do
     t.float "curve"
     t.float "dynamic_lie"
     t.float "dynamic_loft"
+    t.boolean "excluded", default: false, null: false
     t.string "external_id", null: false
     t.float "face_angle"
     t.float "face_to_path"

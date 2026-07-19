@@ -3,12 +3,15 @@ module Api
     class ShotsController < BaseController
       MAX_PER_PAGE = 200
 
-      before_action -> { authenticate_actor!(scope: "telemetry:read") }
+      before_action -> { authenticate_actor!(scope: "telemetry:read") }, only: :index
+      before_action -> { authenticate_actor!(scope: "telemetry:write") }, only: :update
 
       def index
         shots = Shot.for_user(current_user).includes(:club).chronological
         shots = shots.where(training_session_id: params[:session_id]) if params[:session_id].present?
         shots = shots.where(club_id: params[:club_id]) if params[:club_id].present?
+        shots = shots.where(excluded: params[:excluded] == "true") if params[:excluded].present?
+        shots = shots.where(carry: params[:min_carry].to_f..) if params[:min_carry].present?
 
         per_page = [ params.fetch(:per_page, 100).to_i, MAX_PER_PAGE ].min
         page = [ params.fetch(:page, 1).to_i, 1 ].max
@@ -23,10 +26,18 @@ module Api
         }
       end
 
+      # Owners flag shots in or out of analysis. That is the only
+      # mutable field: telemetry itself is immutable once imported.
+      def update
+        shot = Shot.for_user(current_user).find(params[:id])
+        shot.update!(params.permit(:excluded))
+        render json: serialize(shot)
+      end
+
       private
 
       def serialize(shot, with_trajectory: false)
-        columns = %i[id external_id training_session_id struck_at reduced_accuracy] + Shot::TELEMETRY.map(&:to_sym)
+        columns = %i[id external_id training_session_id struck_at reduced_accuracy excluded] + Shot::TELEMETRY.map(&:to_sym)
         columns << :ball_trajectory if with_trajectory
         shot.as_json(only: columns)
             .merge(club: shot.club && { id: shot.club.id, label: shot.club.label })

@@ -1,0 +1,279 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Swing-Stack API",
+    "version": "1.1.0",
+    "description": "Golf launch monitor telemetry. SI units throughout: metres, metres per second, degrees, rpm. Negative side values mean left of target. Humans authenticate with a Bearer JWT. Agents send a scoped key in X-Api-Key. Auth endpoints are rate limited to 10 requests per minute per IP."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "security": [{ "bearerAuth": [] }, { "apiKey": [] }],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Create an account",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Tokens and user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Sign in",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": { "email": { "type": "string" }, "password": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Tokens and user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "description": "Bad credentials" } }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "summary": "Rotate a refresh token",
+        "description": "Refresh tokens are single use. The response carries a new pair.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["refresh_token"], "properties": { "refresh_token": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "New tokens", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "description": "Unknown or reused token" } }
+      }
+    },
+    "/auth/logout": {
+      "delete": {
+        "summary": "Revoke a refresh token",
+        "security": [],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "refresh_token": { "type": "string" } } } } }
+        },
+        "responses": { "204": { "description": "Revoked" } }
+      }
+    },
+    "/api_tokens": {
+      "get": {
+        "summary": "List agent keys",
+        "description": "JWT only. Agent keys cannot manage credentials.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Keys without plaintext" } }
+      },
+      "post": {
+        "summary": "Create a scoped agent key",
+        "description": "JWT only. The plaintext key is returned once, at creation.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "scopes": { "type": "array", "items": { "type": "string", "enum": ["telemetry:read", "telemetry:write"] } },
+                  "ttl_seconds": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Key metadata plus one-time plaintext token" } }
+      }
+    },
+    "/api_tokens/{id}": {
+      "delete": {
+        "summary": "Revoke an agent key",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "Revoked" } }
+      }
+    },
+    "/imports": {
+      "post": {
+        "summary": "Upload a TrackMan report export",
+        "description": "Body is the raw TrackMan report JSON. Parsing runs in a background job. Re-importing the same file changes nothing: sessions and shots upsert on TrackMan UUIDs. Requires telemetry:write.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "202": { "description": "Import batch queued" }, "422": { "description": "Not a JSON object" } }
+      },
+      "get": { "summary": "List import batches", "responses": { "200": { "description": "Latest 50 batches with status" } } }
+    },
+    "/imports/{id}": {
+      "get": {
+        "summary": "Import batch status",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Batch with status and counts" }, "404": { "description": "Unknown batch" } }
+      }
+    },
+    "/sessions": {
+      "get": { "summary": "List practice sessions", "responses": { "200": { "description": "Sessions, newest first" } } }
+    },
+    "/sessions/{id}": {
+      "get": {
+        "summary": "One session",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Session" }, "404": { "description": "Unknown session" } }
+      }
+    },
+    "/shots": {
+      "get": {
+        "summary": "Shot telemetry",
+        "description": "Chronological, paginated. Requires telemetry:read.",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 100, "maximum": 200 } },
+          { "name": "session_id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Only shots from this session" },
+          { "name": "club_id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Only shots with this club" },
+          { "name": "min_carry", "in": "query", "schema": { "type": "number" }, "description": "Only shots carrying at least this many metres. Filters out chips." },
+          { "name": "excluded", "in": "query", "schema": { "type": "boolean" }, "description": "Filter by exclusion flag. Omit to get all shots." },
+          { "name": "include", "in": "query", "schema": { "type": "string", "enum": ["trajectory"] }, "description": "include=trajectory adds ball_trajectory point arrays" }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of shots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "shots": { "type": "array", "items": { "$ref": "#/components/schemas/Shot" } },
+                    "page": { "type": "integer" },
+                    "per_page": { "type": "integer" },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shots/{id}": {
+      "patch": {
+        "summary": "Flag a shot in or out of analysis",
+        "description": "excluded is the only mutable field. Telemetry is immutable once imported. Excluded shots stay listable but never feed /stats/clubs. Requires telemetry:write.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "excluded": { "type": "boolean" } } } } }
+        },
+        "responses": { "200": { "description": "Updated shot", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Shot" } } } }, "403": { "description": "Key lacks telemetry:write" }, "404": { "description": "Not your shot" } }
+      }
+    },
+    "/clubs": {
+      "get": { "summary": "List clubs with shot counts", "responses": { "200": { "description": "Clubs ordered by loft" } } }
+    },
+    "/clubs/{id}": {
+      "patch": {
+        "summary": "Label a club",
+        "description": "JWT only. Labelling is a human action.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "label": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Updated club" } }
+      }
+    },
+    "/stats/clubs": {
+      "get": {
+        "summary": "Per-club aggregates",
+        "description": "Averages and standard deviations computed in PostgreSQL. Excluded shots never count. Requires telemetry:read.",
+        "parameters": [
+          { "name": "session_id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Aggregate one session instead of all time" },
+          { "name": "min_carry", "in": "query", "schema": { "type": "number" }, "description": "Only aggregate shots carrying at least this many metres" }
+        ],
+        "responses": { "200": { "description": "One row per club: shots_count, averages (speeds, angles, distances, face_angle, club_path, face_to_path), dispersion (carry_sd, side_sd, face_angle_sd, club_path_sd, face_to_path_sd, carry_min, carry_max)" } }
+      }
+    },
+    "/openapi.json": {
+      "get": { "summary": "This document", "security": [], "responses": { "200": { "description": "OpenAPI 3.1 description" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Human lane. Short lived access token from /auth/login." },
+      "apiKey": { "type": "apiKey", "in": "header", "name": "X-Api-Key", "description": "Agent lane. Scoped key from /api_tokens. Scopes: telemetry:read, telemetry:write." }
+    },
+    "schemas": {
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "token_type": { "type": "string" },
+          "expires_in": { "type": "integer" },
+          "refresh_token": { "type": "string" },
+          "user": { "type": "object", "properties": { "id": { "type": "string" }, "email": { "type": "string" }, "name": { "type": ["string", "null"] } } }
+        }
+      },
+      "Shot": {
+        "type": "object",
+        "description": "Angles in degrees, positive face_angle is open (right for a right hander), positive club_path is in to out. Distances in metres, speeds in metres per second, spin in rpm. Any telemetry value can be null.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "external_id": { "type": "string", "description": "TrackMan UUID, the idempotency key" },
+          "training_session_id": { "type": "string", "format": "uuid" },
+          "struck_at": { "type": ["string", "null"], "format": "date-time" },
+          "excluded": { "type": "boolean", "description": "Flagged out of analysis by the owner" },
+          "club": { "type": ["object", "null"], "properties": { "id": { "type": "string" }, "label": { "type": "string" } } },
+          "reduced_accuracy": { "type": "array", "items": { "type": "string" } },
+          "club_speed": { "type": ["number", "null"] },
+          "attack_angle": { "type": ["number", "null"] },
+          "club_path": { "type": ["number", "null"] },
+          "dynamic_loft": { "type": ["number", "null"] },
+          "face_angle": { "type": ["number", "null"] },
+          "spin_loft": { "type": ["number", "null"] },
+          "face_to_path": { "type": ["number", "null"] },
+          "swing_plane": { "type": ["number", "null"] },
+          "swing_direction": { "type": ["number", "null"] },
+          "swing_radius": { "type": ["number", "null"] },
+          "low_point_distance": { "type": ["number", "null"] },
+          "impact_offset": { "type": ["number", "null"] },
+          "impact_height": { "type": ["number", "null"] },
+          "dynamic_lie": { "type": ["number", "null"] },
+          "ball_speed": { "type": ["number", "null"] },
+          "smash_factor": { "type": ["number", "null"] },
+          "launch_angle": { "type": ["number", "null"] },
+          "launch_direction": { "type": ["number", "null"] },
+          "spin_rate": { "type": ["number", "null"] },
+          "spin_axis": { "type": ["number", "null"] },
+          "curve": { "type": ["number", "null"] },
+          "max_height": { "type": ["number", "null"] },
+          "carry": { "type": ["number", "null"] },
+          "total_distance": { "type": ["number", "null"] },
+          "carry_side": { "type": ["number", "null"] },
+          "total_side": { "type": ["number", "null"] },
+          "landing_angle": { "type": ["number", "null"] },
+          "hang_time": { "type": ["number", "null"] },
+          "norm_carry": { "type": ["number", "null"] },
+          "norm_total_distance": { "type": ["number", "null"] },
+          "norm_total_side": { "type": ["number", "null"] },
+          "ball_trajectory": {
+            "type": ["array", "null"],
+            "description": "Present with include=trajectory. Points are [downrange m, height m, side m].",
+            "items": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+          }
+        }
+      }
+    }
+  }
+}

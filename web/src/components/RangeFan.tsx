@@ -17,6 +17,7 @@ interface Props {
   shots: FanShot[]
   metric: 'carry' | 'total'
   mode: Mode
+  onToggle: (id: string, excluded: boolean) => void
 }
 
 const W = 480
@@ -44,7 +45,7 @@ function sideLabel(v: number): string {
 
 const kmh = (mps: number) => Math.round(mps * 3.6)
 
-export function RangeFan({ shots, metric, mode }: Props) {
+export function RangeFan({ shots, metric, mode, onToggle }: Props) {
   const ink = INK[mode]
   const [hover, setHover] = useState<Hover | null>(null)
 
@@ -68,7 +69,7 @@ export function RangeFan({ shots, metric, mode }: Props) {
   const ellipses = useMemo(() => {
     const byClub = new Map<string, FanShot[]>()
     for (const s of plotted) {
-      if (!s.club) continue
+      if (!s.club || s.excluded) continue
       byClub.set(s.club.id, [ ...(byClub.get(s.club.id) ?? []), s ])
     }
     return [ ...byClub.values() ]
@@ -155,14 +156,17 @@ export function RangeFan({ shots, metric, mode }: Props) {
               className="fan-dot"
               data-testid="fan-dot"
               data-club={s.clubLabel}
+              data-excluded={s.excluded || undefined}
               cx={p.x}
               cy={p.y}
               r={active ? 6.5 : 4.4}
-              fill={s.color}
-              stroke={ink.surface}
+              fill={s.excluded ? ink.surface : s.color}
+              stroke={s.excluded ? s.color : ink.surface}
               strokeWidth={1.4}
+              opacity={s.excluded ? 0.55 : 1}
               onMouseEnter={() => setHover({ shot: s, x: p.x, y: p.y })}
               onMouseLeave={() => setHover(null)}
+              onClick={() => onToggle(s.id, !s.excluded)}
             />
           )
         })}
@@ -177,6 +181,7 @@ export function RangeFan({ shots, metric, mode }: Props) {
           <div className="head">
             <span className="dot" style={{ background: hover.shot.color }} />
             {hover.shot.clubLabel}
+            {hover.shot.excluded && <span className="flag"> excluded</span>}
           </div>
           {hover.shot.carry !== null && (
             <div className="row"><span>Carry</span><b>{hover.shot.carry.toFixed(1)} m</b></div>
@@ -196,6 +201,7 @@ export function RangeFan({ shots, metric, mode }: Props) {
           {hover.shot.max_height !== null && (
             <div className="row"><span>Apex</span><b>{hover.shot.max_height.toFixed(1)} m</b></div>
           )}
+          <div className="hint">click to {hover.shot.excluded ? 'restore' : 'exclude'}</div>
         </div>
       )}
     </div>

@@ -20,6 +20,44 @@ RSpec.describe "Stats", type: :request do
       expect(mid_iron.dig("dispersion", "carry_sd")).to be_positive
     end
 
+    it "reports face and path averages with spreads" do
+      get "/api/v1/stats/clubs", headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      mid_iron = response.parsed_body.find { |r| r.dig("club", "static_loft_deg").to_f == 31.0 }
+      expect(mid_iron.dig("averages", "face_angle")).to be_a(Float)
+      expect(mid_iron.dig("averages", "club_path")).to be_a(Float)
+      expect(mid_iron.dig("dispersion", "face_angle_sd")).to be_positive
+      expect(mid_iron.dig("dispersion", "face_to_path_sd")).to be_positive
+    end
+
+    it "scopes to a session" do
+      session_id = user.training_sessions.sole.id
+      get "/api/v1/stats/clubs", params: { session_id: session_id },
+                                 headers: api_key_headers(user, scopes: %w[telemetry:read])
+      expect(response.parsed_body.length).to eq(3)
+
+      get "/api/v1/stats/clubs", params: { session_id: SecureRandom.uuid },
+                                 headers: api_key_headers(user, scopes: %w[telemetry:read])
+      expect(response.parsed_body).to be_empty
+    end
+
+    it "honours a minimum carry cutoff" do
+      get "/api/v1/stats/clubs", params: { min_carry: 500 },
+                                 headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      expect(response.parsed_body).to be_empty
+    end
+
+    it "leaves excluded shots out of aggregates" do
+      club = user.clubs.find_by!(static_loft_deg: 54.0)
+      Shot.for_user(user).where(club: club).first.update!(excluded: true)
+
+      get "/api/v1/stats/clubs", headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      wedge = response.parsed_body.find { |r| r.dig("club", "id") == club.id }
+      expect(wedge["shots_count"]).to eq(7)
+    end
+
     it "does not leak other users' telemetry" do
       stranger = create(:user)
       get "/api/v1/stats/clubs", headers: api_key_headers(stranger, scopes: %w[telemetry:read])

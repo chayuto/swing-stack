@@ -107,19 +107,25 @@ function refreshSession(): Promise<boolean> {
   return refreshing
 }
 
-async function apiGet<T>(path: string, retry = true): Promise<T> {
+async function apiFetch<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   if (!tokens) throw new AuthRequiredError()
   const res = await fetch(`${BASE}${path}`, {
-    headers: { Authorization: `Bearer ${tokens.access}` },
+    ...init,
+    headers: {
+      Authorization: `Bearer ${tokens.access}`,
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+    },
   })
   if (res.status === 401) {
-    if (retry && (await refreshSession())) return apiGet<T>(path, false)
+    if (retry && (await refreshSession())) return apiFetch<T>(path, init, false)
     storeTokens(null)
     throw new AuthRequiredError()
   }
-  if (!res.ok) throw new Error(`GET ${path} failed (${res.status})`)
+  if (!res.ok) throw new Error(`${init.method ?? 'GET'} ${path} failed (${res.status})`)
   return (await res.json()) as T
 }
+
+const apiGet = <T,>(path: string) => apiFetch<T>(path)
 
 // Dev convenience: sign in as the seeded demo user when no session
 // exists. Set VITE_AUTO_LOGIN=false to require the login form instead.
@@ -156,4 +162,6 @@ export const api = {
   clubs: () => apiGet<Club[]>('/clubs'),
   clubStats: () => apiGet<ClubStats[]>('/stats/clubs'),
   shots: allShots,
+  setShotExcluded: (id: string, excluded: boolean) =>
+    apiFetch<Shot>(`/shots/${id}`, { method: 'PATCH', body: JSON.stringify({ excluded }) }),
 }

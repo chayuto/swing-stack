@@ -8,6 +8,9 @@ class Shot < ApplicationRecord
 
   scope :for_user, ->(user) { joins(:training_session).where(training_sessions: { user_id: user.id }) }
   scope :chronological, -> { order(:struck_at) }
+  # Shots the owner has flagged out of analysis (mishits, warm-up chips)
+  # stay queryable but never feed aggregates.
+  scope :analyzed, -> { where(excluded: false) }
 
   # Telemetry columns exposed by the API, in display order.
   TELEMETRY = %w[

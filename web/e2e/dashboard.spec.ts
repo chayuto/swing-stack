@@ -71,6 +71,29 @@ test('metric toggle switches the fan to total distance', async ({ page }) => {
   expect(await page.getByTestId('fan-dot').count()).toBeGreaterThan(0)
 })
 
+test('shot shape chart renders', async ({ page }) => {
+  await expect(page.getByTestId('shot-shape-chart')).toBeVisible()
+  await expect(page.getByTestId('shot-shape-chart').locator('canvas')).toBeVisible()
+})
+
+test('excluding a shot drops it from stats and restores on second click', async ({ page }) => {
+  const shotsTile = page.getByTestId('stat-shots').getByTestId('stat-value')
+  const before = Number(await shotsTile.innerText())
+  const dot = page.getByTestId('fan-dot').first()
+
+  // Exclude: the dot stays plotted but hollow, and the count drops.
+  await dot.click()
+  const hollow = page.locator('[data-testid="fan-dot"][data-excluded]')
+  await expect(hollow).toHaveCount(1)
+  await expect(page.getByTestId('excluded-note')).toBeVisible()
+  await expect(shotsTile).toHaveText(String(before - 1))
+
+  // Restore, so the suite leaves the seeded data untouched.
+  await hollow.click()
+  await expect(page.locator('[data-testid="fan-dot"][data-excluded]')).toHaveCount(0)
+  await expect(shotsTile).toHaveText(String(before))
+})
+
 test('theme toggle stamps an explicit theme', async ({ page }) => {
   const toggle = page.getByTestId('theme-toggle')
   await toggle.click() // auto -> light

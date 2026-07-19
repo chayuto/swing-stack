@@ -15,11 +15,14 @@ Rails.application.routes.draw do
       # Telemetry pipeline
       resources :imports, only: %i[create index show]
       resources :sessions, only: %i[index show], controller: :training_sessions
-      resources :shots, only: :index
+      resources :shots, only: %i[index update]
       resources :clubs, only: %i[index update]
 
       # Analytics
       get "stats/clubs", to: "stats#clubs"
+
+      # Machine-readable API description, no auth required
+      get "openapi.json", to: "docs#openapi"
     end
   end
 end

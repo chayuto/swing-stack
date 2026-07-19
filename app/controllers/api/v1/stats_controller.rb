@@ -24,15 +24,22 @@ module Api
         STDDEV_SAMP(shots.carry_side) AS sd_carry_side,
         AVG(shots.attack_angle)       AS avg_attack_angle,
         AVG(shots.club_path)          AS avg_club_path,
-        AVG(shots.face_to_path)       AS avg_face_to_path
+        STDDEV_SAMP(shots.club_path)  AS sd_club_path,
+        AVG(shots.face_angle)         AS avg_face_angle,
+        STDDEV_SAMP(shots.face_angle) AS sd_face_angle,
+        AVG(shots.face_to_path)       AS avg_face_to_path,
+        STDDEV_SAMP(shots.face_to_path) AS sd_face_to_path
       SQL
 
       def clubs
-        rows = Shot.for_user(current_user)
-                   .joins(:club)
-                   .group("clubs.id", "clubs.label", "clubs.static_loft_deg")
-                   .order("clubs.static_loft_deg")
-                   .select(AGGREGATES)
+        shots = Shot.for_user(current_user).analyzed
+        shots = shots.where(training_session_id: params[:session_id]) if params[:session_id].present?
+        shots = shots.where(carry: params[:min_carry].to_f..) if params[:min_carry].present?
+
+        rows = shots.joins(:club)
+                    .group("clubs.id", "clubs.label", "clubs.static_loft_deg")
+                    .order("clubs.static_loft_deg")
+                    .select(AGGREGATES)
 
         render json: rows.map { |row| serialize(row) }
       end
@@ -54,13 +61,17 @@ module Api
             total_distance: round(row[:avg_total_distance]),
             attack_angle: round(row[:avg_attack_angle]),
             club_path: round(row[:avg_club_path]),
+            face_angle: round(row[:avg_face_angle]),
             face_to_path: round(row[:avg_face_to_path])
           },
           dispersion: {
             carry_sd: round(row[:sd_carry]),
             carry_min: round(row[:min_carry]),
             carry_max: round(row[:max_carry]),
-            side_sd: round(row[:sd_carry_side])
+            side_sd: round(row[:sd_carry_side]),
+            club_path_sd: round(row[:sd_club_path]),
+            face_angle_sd: round(row[:sd_face_angle]),
+            face_to_path_sd: round(row[:sd_face_to_path])
           }
         }
       end

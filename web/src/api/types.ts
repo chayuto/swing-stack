@@ -48,6 +48,8 @@ export interface Shot {
   struck_at: string | null
   club: ClubRef | null
   reduced_accuracy: string[]
+  /** Flagged out of analysis by the owner; stays visible, never feeds stats */
+  excluded: boolean
   club_speed: number | null
   attack_angle: number | null
   club_path: number | null
@@ -104,6 +106,7 @@ export interface ClubStats {
     total_distance: number | null
     attack_angle: number | null
     club_path: number | null
+    face_angle: number | null
     face_to_path: number | null
   }
   dispersion: {
@@ -111,5 +114,8 @@ export interface ClubStats {
     carry_min: number | null
     carry_max: number | null
     side_sd: number | null
+    club_path_sd: number | null
+    face_angle_sd: number | null
+    face_to_path_sd: number | null
   }
 }

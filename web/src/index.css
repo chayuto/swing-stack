@@ -305,6 +305,17 @@ button {
   overflow-x: auto;
 }
 
+.shape-card {
+  margin-top: 14px;
+}
+
+/* Cap the plot width so the degree axes stay near-isometric and the
+   face = path diagonal reads at a sane angle. */
+.shape-chart {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
 @media (max-width: 1000px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -388,6 +399,24 @@ button {
   color: var(--text);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.viz-tooltip .head .flag {
+  color: var(--muted);
+  font-weight: 500;
+  font-style: italic;
+}
+
+.viz-tooltip .hint {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.excluded-note {
+  color: var(--text-2);
+  font-style: italic;
 }
 
 /* ---------- club table ---------- */
