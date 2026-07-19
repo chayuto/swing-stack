@@ -7,6 +7,10 @@ user = User.find_or_create_by!(email: "demo@swing-stack.dev") do |u|
   u.name = "Demo Player"
 end
 
+# Audit attribution for seed-time edits. The import job overrides this
+# with "import_batch:<id>" while it runs.
+PaperTrail.request.whodunnit = "seeds"
+
 results = Trackman::FileIngest.new(user: user, dir: Rails.root.join("data")).call
 results.each { |r| puts r.to_line }
 puts "No data/*.json exports found — skipping telemetry seed" if results.empty?

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_153430) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_155653) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -141,6 +141,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_153430) do
     t.string "password_digest", null: false
     t.datetime "updated_at", null: false
     t.index "lower((email)::text)", name: "index_users_on_lower_email", unique: true
+  end
+
+  create_table "versions", force: :cascade do |t|
+    t.datetime "created_at"
+    t.string "event", null: false
+    t.uuid "item_id", null: false
+    t.string "item_type", null: false
+    t.jsonb "object"
+    t.jsonb "object_changes"
+    t.string "whodunnit"
+    t.index ["created_at"], name: "index_versions_on_created_at"
+    t.index ["item_type", "item_id"], name: "index_versions_on_item_type_and_item_id"
   end
 
   add_foreign_key "api_tokens", "users"

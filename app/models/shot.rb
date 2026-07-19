@@ -1,4 +1,8 @@
 class Shot < ApplicationRecord
+  # Creation is already documented by the import batch (source file and
+  # raw payload); the audit trail only needs edits after that.
+  has_paper_trail on: %i[update destroy]
+
   belongs_to :training_session
   belongs_to :club, optional: true
 

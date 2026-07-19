@@ -13,4 +13,22 @@ namespace :trackman do
       puts "Unlabeled club: #{club.static_loft_deg}°. Add a label to db/seeds.rb and re-run bin/rails db:seed."
     end
   end
+
+  desc "Show recent audit trail entries (LIMIT=50)"
+  task audit: :environment do
+    limit = ENV.fetch("LIMIT", "50").to_i
+    versions = PaperTrail::Version.order(created_at: :desc).limit(limit).to_a
+    puts "No audit entries." if versions.empty?
+
+    versions.reverse_each do |v|
+      line = "#{v.created_at.strftime('%Y-%m-%d %H:%M:%S')}  #{v.event.ljust(7)}  " \
+             "#{v.item_type}##{v.item_id.to_s[0, 8]}  by #{v.whodunnit || 'unknown'}"
+      diff = (v.object_changes || {}).except("updated_at").map do |attr, (from, to)|
+        "#{attr}: #{from.inspect.truncate(40)} -> #{to.inspect.truncate(40)}"
+      end
+      line += "  [#{v.object&.dig('label') || v.object&.dig('external_id')}]" if v.event == "destroy"
+      puts line
+      diff.each { |d| puts "    #{d}" }
+    end
+  end
 end

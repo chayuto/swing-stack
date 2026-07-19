@@ -9,7 +9,9 @@ class TrackmanImportJob < ApplicationJob
     return unless batch.pending?
 
     batch.processing!
-    result = Trackman::Importer.new(user: batch.user, payload: batch.raw_payload).call
+    result = PaperTrail.request(whodunnit: "import_batch:#{batch.id}") do
+      Trackman::Importer.new(user: batch.user, payload: batch.raw_payload).call
+    end
     batch.mark_completed!(sessions_count: result.sessions_count, shots_count: result.shots_count)
   rescue StandardError => e
     batch&.mark_failed!(e)

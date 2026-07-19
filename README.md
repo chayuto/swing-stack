@@ -53,6 +53,11 @@ Drop your TrackMan report exports into `data/` and run
 duplicates shots, and the task flags any club loft that still needs a
 label. `db:seed` bootstraps a fresh database the same way.
 
+Every edit to telemetry is audited (paper_trail): before/after diffs
+plus the actor. Re-imports attribute to their import batch, dashboard
+and API edits to the user or agent token, seed fixes to `seeds`.
+`bin/rails trackman:audit` prints recent changes.
+
 `docker compose up --build` starts the API and PostgreSQL in one command.
 
 ## Back up and restore

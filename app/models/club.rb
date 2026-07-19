@@ -2,6 +2,10 @@
 # fingerprint present in launch monitor exports, which never name the
 # club. Users attach a human label ("7 Iron") after the fact.
 class Club < ApplicationRecord
+  # Clubs are born, relabelled, and occasionally removed by hand, so
+  # every event is audit-worthy (see the phantom 27° club in seeds).
+  has_paper_trail
+
   belongs_to :user
   has_many :shots, dependent: :nullify
 

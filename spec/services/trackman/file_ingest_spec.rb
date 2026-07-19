@@ -55,6 +55,22 @@ RSpec.describe Trackman::FileIngest do
     expect(user.shots.count).to eq(52)
   end
 
+  it "attributes re-import value changes to the importing batch" do
+    stage("report.json")
+    ingest
+    first_batch = user.import_batches.sole
+    changed = JSON.parse(file_fixture("trackman_report.json").read)
+    changed["StrokeGroups"][0]["Strokes"][0]["Measurement"]["Carry"] = 999.0
+    stage("report.json", JSON.generate(changed))
+
+    ingest
+
+    new_batch = user.import_batches.where.not(id: first_batch.id).sole
+    version = PaperTrail::Version.where(item_type: "Shot").sole
+    expect(version.whodunnit).to eq("import_batch:#{new_batch.id}")
+    expect(version.object_changes["carry"].last).to eq(999.0)
+  end
+
   it "reports invalid JSON as failed without a batch and still ingests the rest" do
     stage("bad.json", "{ nope")
     stage("good.json")
