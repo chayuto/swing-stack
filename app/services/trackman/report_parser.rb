@@ -72,17 +72,18 @@ module Trackman
           longitude: env.dig("Location", "Longitude"),
           temperature: env["Temperature"]
         },
-        shots: Array(group["Strokes"]).map { |stroke| parse_stroke(stroke) }
+        shots: Array(group["Strokes"]).map { |stroke| parse_stroke(stroke, group_club: group["Club"]) }
       }
     end
 
-    def parse_stroke(stroke)
+    def parse_stroke(stroke, group_club: nil)
       measurement = stroke["Measurement"] || {}
       normalized = stroke["NormalizedMeasurement"] || {}
 
       shot = {
         external_id: stroke.fetch("Id"),
         struck_at: stroke["Time"],
+        club_name: stroke["Club"] || group_club,
         static_loft_deg: static_loft_deg(stroke),
         reduced_accuracy: Array(measurement["ReducedAccuracy"]),
         ball_trajectory: compact_trajectory(measurement["BallTrajectory"])
@@ -92,8 +93,9 @@ module Trackman
       shot
     end
 
-    # The club's static loft (radians in the export) is the club
-    # fingerprint — exports never carry a club name.
+    # The loft (radians) of the club config the bay had attached to the
+    # stroke. A config, not a measurement, and often stale — some
+    # exports carry no club name, and then this is all there is.
     def static_loft_deg(stroke)
       radians = stroke.dig("MeasurementDetails", "ImpactLocation", "ClubConfiguration", "StaticLoft")
       return nil if radians.nil?

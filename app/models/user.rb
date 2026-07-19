@@ -4,6 +4,7 @@ class User < ApplicationRecord
   has_many :refresh_tokens, dependent: :destroy
   has_many :api_tokens, dependent: :destroy
   has_many :clubs, dependent: :destroy
+  has_many :club_lofts, dependent: :destroy
   has_many :training_sessions, dependent: :destroy
   has_many :import_batches, dependent: :destroy
   has_many :shots, through: :training_sessions

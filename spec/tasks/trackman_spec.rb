@@ -30,6 +30,25 @@ RSpec.describe "trackman rake tasks" do
     end
   end
 
+  describe "trackman:reclassify" do
+    it "re-resolves clubs from stored payloads through the current mappings" do
+      user = create(:user)
+      ENV["INGEST_EMAIL"] = user.email
+      batch = user.import_batches.create!(source: "trackman", status: :pending,
+                                          raw_payload: trackman_payload, filename: "sample.json")
+      TrackmanImportJob.perform_now(batch.id)
+
+      seven = user.clubs.find_by!(static_loft_deg: 31.0)
+      user.club_lofts.where(loft_deg: [ 39.0, 54.0 ]).find_each { |m| m.update!(club: seven) }
+
+      expect { invoke("trackman:reclassify") }
+        .to output(/sample\.json: 52 shot\(s\) revisited/).to_stdout
+      expect(seven.reload.shots.count).to eq(51)
+    ensure
+      ENV.delete("INGEST_EMAIL")
+    end
+  end
+
   describe "trackman:audit" do
     it "prints nothing but a notice when there are no entries" do
       expect { invoke("trackman:audit") }.to output(/No audit entries\./).to_stdout

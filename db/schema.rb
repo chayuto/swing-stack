@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_155653) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_20_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -29,10 +29,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_155653) do
     t.index ["user_id"], name: "index_api_tokens_on_user_id"
   end
 
+  create_table "club_lofts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "club_id", null: false
+    t.datetime "created_at", null: false
+    t.decimal "loft_deg", precision: 4, scale: 1, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["club_id"], name: "index_club_lofts_on_club_id"
+    t.index ["user_id", "loft_deg"], name: "index_club_lofts_on_user_id_and_loft_deg", unique: true
+  end
+
   create_table "clubs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "label", null: false
-    t.decimal "static_loft_deg", precision: 4, scale: 1, null: false
+    t.decimal "static_loft_deg", precision: 4, scale: 1
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.index ["user_id", "static_loft_deg"], name: "index_clubs_on_user_id_and_static_loft_deg", unique: true
@@ -72,6 +82,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_155653) do
     t.float "attack_angle"
     t.float "ball_speed"
     t.jsonb "ball_trajectory"
+    t.string "bay_club"
+    t.decimal "bay_loft_deg", precision: 4, scale: 1
     t.float "carry"
     t.float "carry_side"
     t.uuid "club_id"
@@ -156,6 +168,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_155653) do
   end
 
   add_foreign_key "api_tokens", "users"
+  add_foreign_key "club_lofts", "clubs"
+  add_foreign_key "club_lofts", "users"
   add_foreign_key "clubs", "users"
   add_foreign_key "import_batches", "users"
   add_foreign_key "refresh_tokens", "users"

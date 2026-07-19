@@ -10,7 +10,24 @@ namespace :trackman do
     puts "No data/*.json exports found" if results.empty?
 
     user.clubs.where("label LIKE '%°'").order(:static_loft_deg).each do |club|
-      puts "Unlabeled club: #{club.static_loft_deg}°. Add a label to db/seeds.rb and re-run bin/rails db:seed."
+      puts "Unlabeled club: #{club.static_loft_deg}°. Map it to a bag club in db/seeds.rb and re-run bin/rails db:seed."
+    end
+  end
+
+  desc "Re-run the importer over completed batches (re-resolves clubs from stored payloads)"
+  task reclassify: :environment do
+    email = ENV.fetch("INGEST_EMAIL", "demo@swing-stack.dev")
+    user = User.find_by(email: email)
+    abort "No user #{email}. Run bin/rails db:seed first." unless user
+
+    batches = user.import_batches.where(status: :completed).order(:created_at).to_a
+    puts "No completed import batches." if batches.empty?
+
+    batches.each do |batch|
+      result = PaperTrail.request(whodunnit: "import_batch:#{batch.id}") do
+        Trackman::Importer.new(user: user, payload: batch.raw_payload).call
+      end
+      puts "#{batch.filename || batch.id}: #{result.shots_count} shot(s) revisited"
     end
   end
 

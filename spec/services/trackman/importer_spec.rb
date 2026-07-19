@@ -28,7 +28,30 @@ RSpec.describe Trackman::Importer do
     )
   end
 
-  it "fingerprints clubs by static loft and groups shots onto them" do
+  it "prefers the exported club name over the loft config" do
+    payload = trackman_payload.deep_dup
+    payload["StrokeGroups"][0]["Strokes"][0]["Club"] = "Driver"
+
+    described_class.new(user: user, payload: payload).call
+
+    driver = user.clubs.find_by!(label: "Driver")
+    shot = driver.shots.sole
+    expect(shot.bay_club).to eq("Driver")
+    expect(shot.bay_loft_deg).to be_present # the config is kept even when the name overrides it
+    expect(driver.static_loft_deg).to be_nil # spec unknown until claimed in the bag map
+  end
+
+  it "resolves bay lofts through the user's club mappings" do
+    seven = user.clubs.create!(label: "7 Iron", static_loft_deg: 31.0)
+    [ 39.0, 54.0 ].each { |loft| user.club_lofts.create!(club: seven, loft_deg: loft) }
+
+    import
+
+    expect(user.clubs.sole).to eq(seven)
+    expect(seven.shots.count).to eq(51)
+  end
+
+  it "creates placeholder clubs for unmapped lofts and groups shots onto them" do
     import
 
     expect(user.clubs.order(:static_loft_deg).pluck(:static_loft_deg, :label))
@@ -42,6 +65,8 @@ RSpec.describe Trackman::Importer do
     import
     shot = user.shots.find_by!(external_id: "1e9cd215-7b04-4675-b342-08dfa1721aae")
 
+    expect(shot.bay_loft_deg).to eq(39.0) # observed config kept verbatim
+    expect(shot.bay_club).to be_nil # this export carries no club names
     expect(shot.club_speed).to be_within(0.001).of(36.352)
     expect(shot.carry).to be_within(0.01).of(129.65)
     expect(shot.total_distance).to be_within(0.01).of(148.12)

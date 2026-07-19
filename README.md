@@ -50,8 +50,11 @@ npm run dev        # http://localhost:5173
 Drop your TrackMan report exports into `data/` and run
 `bin/rails trackman:ingest`. Files are tracked by checksum in
 `import_batches`, so only new exports are parsed. Ingesting never
-duplicates shots, and the task flags any club loft that still needs a
-label. `db:seed` bootstraps a fresh database the same way.
+duplicates shots, and the task flags any club config it has not seen
+before. Claim new configs in the bag definition in `db/seeds.rb` and
+re-run `bin/rails db:seed`; `bin/rails trackman:reclassify` re-resolves
+existing shots from their stored payloads after the map changes.
+`db:seed` bootstraps a fresh database the same way.
 
 Every edit to telemetry is audited (paper_trail): before/after diffs
 plus the actor. Re-imports attribute to their import batch, dashboard
@@ -97,9 +100,16 @@ same file twice changes nothing.
   tokens. Machines get scoped API keys (`telemetry:read`, `telemetry:write`)
   that can never mint new credentials. Different clients fail differently, so
   they authenticate differently.
-- **Clubs from loft.** Exports do not name the club. The club head's static
-  loft is a stable fingerprint, so shots group themselves and you attach labels
-  like "7 Iron" once.
+- **Factual imports, interpreted clubs.** Every shot stores the club facts
+  its export carried, verbatim: the club name (`bay_club`, the field
+  TrackMan's own UI groups by) and the bay's loft config (`bay_loft_deg`).
+  The name decides the club where present. Some exports omit it, and the
+  loft config alone is unreliable (the bay attaches whatever it has
+  selected; a 7 iron has arrived as 27.0, 35.5, 39.0 and 54.0 degrees), so
+  nameless strokes resolve through a bag map (`db/seeds.rb`) from observed
+  configs to real clubs. Unknown configs get a placeholder club until
+  claimed. Club assignment is an interpretation you can always redo from
+  the stored facts, never a destructive edit.
 - **Analytics in the database.** Per-club averages and dispersion come from one
   grouped SQL query, not application code.
 - **UUID keys and rate limits.** No guessable IDs, and Rack::Attack throttles

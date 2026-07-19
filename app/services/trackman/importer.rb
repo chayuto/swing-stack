@@ -36,11 +36,22 @@ module Trackman
     end
 
     def upsert_shot(session, attrs)
+      # Both club facts from the export are stored verbatim (bay_club,
+      # bay_loft_deg); the club assignment is our interpretation. The
+      # name is what TrackMan's own UI groups by, so it wins. The loft
+      # config is unreliable and only breaks ties for nameless strokes,
+      # resolved through the user's bag map.
+      name = attrs.delete(:club_name)
       loft = attrs.delete(:static_loft_deg)
-      club = loft && Club.for_loft!(@user, loft)
+      club =
+        if name.present?
+          Club.for_name!(@user, name)
+        elsif loft
+          Club.for_loft!(@user, loft)
+        end
 
       shot = session.shots.find_or_initialize_by(external_id: attrs[:external_id])
-      shot.update!(attrs.except(:external_id).merge(club: club))
+      shot.update!(attrs.except(:external_id).merge(club: club, bay_club: name, bay_loft_deg: loft))
       shot
     end
   end

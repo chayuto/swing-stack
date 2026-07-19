@@ -37,7 +37,7 @@ module Api
       private
 
       def serialize(shot, with_trajectory: false)
-        columns = %i[id external_id training_session_id struck_at reduced_accuracy excluded] + Shot::TELEMETRY.map(&:to_sym)
+        columns = %i[id external_id training_session_id struck_at reduced_accuracy excluded bay_club bay_loft_deg] + Shot::TELEMETRY.map(&:to_sym)
         columns << :ball_trajectory if with_trajectory
         shot.as_json(only: columns)
             .merge(club: shot.club && { id: shot.club.id, label: shot.club.label })
