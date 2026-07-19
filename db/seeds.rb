@@ -17,7 +17,7 @@ else
 end
 
 # Attach human labels to the loft fingerprints (only while still unlabelled).
-{ 31.0 => "7 Iron", 35.5 => "8 Iron", 39.0 => "9 Iron", 54.0 => "Sand Wedge" }.each do |loft, label|
+{ 10.5 => "Driver", 31.0 => "7 Iron", 35.5 => "8 Iron", 39.0 => "9 Iron", 54.0 => "Sand Wedge" }.each do |loft, label|
   club = user.clubs.find_by(static_loft_deg: loft)
   club.update!(label: label) if club && club.label.end_with?("°")
 end
