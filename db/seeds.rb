@@ -17,4 +17,9 @@ puts "No data/*.json exports found — skipping telemetry seed" if results.empty
   club.update!(label: label) if club && club.label.end_with?("°")
 end
 
+# One stroke in the 2026-06-22 session carries a 27.0° club config, a
+# bay misconfiguration on TrackMan's side. We own no such club. Drop the
+# phantom club; dependent: :nullify leaves the stroke as unclassified.
+user.clubs.find_by(static_loft_deg: 27.0)&.destroy!
+
 puts "Seeded. Login: demo@swing-stack.dev / #{ENV.fetch('DEMO_PASSWORD', 'demo-password-123')}"
