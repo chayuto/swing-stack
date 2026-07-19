@@ -18,4 +18,5 @@ Rails 8.1 API + React dashboard for golf launch monitor telemetry.
 - Frontend lives in `web/` (Vite + React + TS). E2E tests: `npx playwright test` from `web/`. They need a seeded dev DB, so they run locally, not in CI.
 - Test ids: kebab-case `data-testid` on chart marks and stat values. Use role-based locators for buttons and forms.
 - `data/` and `docs/personal/` are gitignored. Never commit launch monitor exports (they contain player names and emails).
+- The local database is the only copy. Run `bin/rails snapshot:create` before destructive DB work. `CONFIRM=1 bin/rails snapshot:restore` brings back the newest dump. See the `/snapshot` skill.
 - Never add co-author lines to commits.

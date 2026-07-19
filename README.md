@@ -43,6 +43,23 @@ Re-seeding never duplicates shots.
 
 `docker compose up --build` starts the API and PostgreSQL in one command.
 
+## Back up and restore
+
+There is no hosted deployment. The database on your machine is the only
+copy, so snapshots are the safety net.
+
+```sh
+bin/rails snapshot:create                 # data/snapshots/20260719_213045_swing_stack_development.dump
+bin/rails "snapshot:create[pre_import]"   # optional label
+bin/rails snapshot:list
+CONFIRM=1 bin/rails snapshot:restore      # newest snapshot, wipes the database first
+bin/rails "snapshot:prune[10]"            # keep the newest 10
+```
+
+Snapshots are compressed pg_dump archives, so they restore on any machine
+with the same or newer PostgreSQL. They carry the same personal data as the
+raw exports, which is why they live in the gitignored `data/` directory.
+
 ## How it works
 
 ```mermaid

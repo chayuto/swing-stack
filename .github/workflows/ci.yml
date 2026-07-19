@@ -80,6 +80,13 @@ jobs:
         with:
           bundler-cache: true
 
+      - name: Install PostgreSQL 18 client (snapshot specs shell out to pg_dump)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+
       - name: Prepare test database
         run: bin/rails db:test:prepare
 
