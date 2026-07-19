@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts/core'
 import { LineChart, ScatterChart, CustomChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, MarkLineComponent, GraphicComponent } from 'echarts/components'
+import { GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, GraphicComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsCoreOption } from 'echarts/core'
 
@@ -12,6 +12,7 @@ echarts.use([
   GridComponent,
   TooltipComponent,
   MarkLineComponent,
+  MarkAreaComponent,
   GraphicComponent,
   CanvasRenderer,
 ])

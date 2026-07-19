@@ -18,6 +18,9 @@ Store your golf launch monitor data. See it as charts. Query it from an API.
 - **Gapping.** Carry per club: every shot, the mean, and the spread.
 - **Shot shape.** Face angle against club path, so you can see a hook or slice
   pattern building. Click a dot to exclude a mishit from every stat.
+- **Progress over time.** Every shot in order across sessions, with a rolling
+  average per club and a latest-vs-earlier readout. Face angle by default,
+  or any of eleven metrics.
 - **Club averages.** Speed, smash, spin, apex, and dispersion, computed in the database.
 - **An API for everything.** The dashboard is just a client. Scripts and AI agents get their own scoped keys.
 

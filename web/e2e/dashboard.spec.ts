@@ -71,6 +71,25 @@ test('metric toggle switches the fan to total distance', async ({ page }) => {
   expect(await page.getByTestId('fan-dot').count()).toBeGreaterThan(0)
 })
 
+test('progress card plots the face angle trend with a readout', async ({ page }) => {
+  await expect(page.getByTestId('trend-chart')).toBeVisible()
+  await expect(page.getByTestId('trend-chart').locator('canvas')).toBeVisible()
+  await expect(page.getByTestId('trend-metric')).toHaveValue('face_angle')
+  await expect(page.getByTestId('trend-latest')).toContainText('°')
+})
+
+test('progress metric selector switches the trend', async ({ page }) => {
+  await page.getByTestId('trend-metric').selectOption('carry')
+  await expect(page.getByTestId('trend-hint')).toContainText('Airborne distance')
+  await expect(page.getByTestId('trend-latest')).toContainText('m')
+})
+
+test('progress card shows a per-club legend for several clubs', async ({ page }) => {
+  const chips = page.getByTestId('filter-club')
+  test.skip((await chips.count()) < 2, 'needs at least two club chips')
+  await expect(page.getByTestId('trend-legend')).toBeVisible()
+})
+
 test('shot shape chart renders', async ({ page }) => {
   await expect(page.getByTestId('shot-shape-chart')).toBeVisible()
   await expect(page.getByTestId('shot-shape-chart').locator('canvas')).toBeVisible()

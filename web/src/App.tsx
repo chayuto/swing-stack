@@ -12,6 +12,7 @@ import type { FanShot } from './components/RangeFan'
 import { TrajectoryChart } from './components/TrajectoryChart'
 import { GappingChart } from './components/GappingChart'
 import { ShotShapeChart } from './components/ShotShapeChart'
+import { TrendCard } from './components/TrendCard'
 import { ClubTable } from './components/ClubTable'
 import { LoginPanel } from './components/LoginPanel'
 
@@ -129,6 +130,16 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
     [enriched, sessionId, activeClubs],
   )
 
+  // The trend card always spans all sessions (that is the point of a
+  // trend), so it takes the club filter but not the session filter.
+  const clubFiltered = useMemo(
+    () =>
+      enriched.filter(
+        (s) => activeClubs === null || activeClubs.has(s.club?.id ?? UNCLASSIFIED_KEY),
+      ),
+    [enriched, activeClubs],
+  )
+
   // Excluded shots stay visible (hollow dots) so they can be restored,
   // but every stat and aggregate chart ignores them.
   const analyzed = useMemo(() => filtered.filter((s) => !s.excluded), [filtered])
@@ -147,6 +158,13 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
         onMetricChange={setMetric}
       />
       <StatTiles shots={analyzed} />
+      <TrendCard
+        shots={clubFiltered}
+        sessions={data.sessions}
+        selectedSessionId={sessionId}
+        mode={mode}
+        onToggle={onToggleShot}
+      />
       <div className="dashboard-grid">
         <section className="card" aria-label="Shot dispersion">
           <h2>Dispersion</h2>
