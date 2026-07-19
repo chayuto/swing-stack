@@ -86,6 +86,9 @@ jobs:
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-18
+          # The /usr/bin wrappers resolve to the runner's preinstalled
+          # version, so put the real 18 binaries first on PATH.
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
 
       - name: Prepare test database
         run: bin/rails db:test:prepare
