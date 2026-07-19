@@ -1,0 +1,39 @@
+# One-command demo stack: PostgreSQL + the Rails API with Solid Queue
+# workers running inside Puma (no Redis required — background jobs,
+# cache and cable are all database-backed via the Solid trifecta).
+#
+#   docker compose up --build
+#   curl http://localhost:3000/up
+#
+# The SECRET_KEY_BASE below is a throwaway for local demos only.
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: swing_stack
+      POSTGRES_PASSWORD: swing_stack
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swing_stack"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build: .
+    ports:
+      - "3000:80"
+    environment:
+      DB_HOST: db
+      DB_USERNAME: swing_stack
+      SWING_STACK_DATABASE_PASSWORD: swing_stack
+      SECRET_KEY_BASE: local-demo-only-not-a-real-secret-0000000000000000
+      SOLID_QUEUE_IN_PUMA: "1"
+      RAILS_LOG_TO_STDOUT: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pg_data:
