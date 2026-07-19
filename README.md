@@ -22,6 +22,15 @@ Store your golf launch monitor data. See it as charts. Query it from an API.
   average per club and a latest-vs-earlier readout. Face angle by default,
   or any of eleven metrics.
 - **Club averages.** Speed, smash, spin, apex, and dispersion, computed in the database.
+- **3D shot view.** The current filter selection in an interactive 3D scene:
+  orbit camera, hover metadata, and replay where every ball launches at once
+  with its real reconstructed timing. Powered by
+  [golf-shot-viz](https://github.com/chayuto/golf-shot-viz), a standalone
+  library extracted from this project
+  ([npm](https://www.npmjs.com/package/golf-shot-viz),
+  [live demo](https://chayuto.github.io/golf-shot-viz)) and consumed from
+  the registry like any other dependency. This repo is its reference
+  consumer.
 - **An API for everything.** The dashboard is just a client. Scripts and AI agents get their own scoped keys.
 
 ## Run it

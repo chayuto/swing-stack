@@ -16,6 +16,7 @@ interface Props {
   onToggleClub: (key: string) => void
   metric: 'carry' | 'total'
   onMetricChange: (m: 'carry' | 'total') => void
+  onOpen3D: () => void
 }
 
 function sessionName(s: TrainingSession): string {
@@ -34,6 +35,7 @@ export function FilterBar({
   onToggleClub,
   metric,
   onMetricChange,
+  onOpen3D,
 }: Props) {
   return (
     <div className="filter-bar" data-testid="filter-bar">
@@ -75,6 +77,10 @@ export function FilterBar({
           Total
         </button>
       </div>
+
+      <button className="ghost-btn open-3d" data-testid="open-3d" onClick={onOpen3D}>
+        3D view
+      </button>
     </div>
   )
 }

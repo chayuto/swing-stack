@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { currentUser } from './api/client'
 import type { Mode } from './theme'
 import { slotColor } from './theme'
@@ -15,6 +15,13 @@ import { ShotShapeChart } from './components/ShotShapeChart'
 import { TrendCard } from './components/TrendCard'
 import { ClubTable } from './components/ClubTable'
 import { LoginPanel } from './components/LoginPanel'
+import { toShotInput } from './api/toShotInput'
+import type { ShotInput } from 'golf-shot-viz'
+
+// three.js only loads when someone opens the 3D view.
+const ShotViz3D = lazy(() =>
+  import('./components/ShotViz3D').then((m) => ({ default: m.ShotViz3D })),
+)
 
 type ThemePref = 'auto' | 'light' | 'dark'
 
@@ -57,6 +64,7 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
   const [sessionId, setSessionId] = useState('all')
   const [activeClubs, setActiveClubs] = useState<Set<string> | null>(null)
   const [metric, setMetric] = useState<'carry' | 'total'>('carry')
+  const [viz3DOpen, setViz3DOpen] = useState(false)
 
   // Fixed slot assignment from the full club list (ordered by loft), so
   // colors follow the club and never change when filters do.
@@ -145,6 +153,15 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
   const analyzed = useMemo(() => filtered.filter((s) => !s.excluded), [filtered])
   const excludedCount = filtered.length - analyzed.length
 
+  // The 3D view takes the current filter selection with the same club
+  // colors as the charts. golf-shot-viz is this project's own library.
+  const shots3D = useMemo<ShotInput[]>(() => {
+    const labels = new Map(data.sessions.map((s) => [s.id, s.played_on ?? s.external_id.slice(0, 8)]))
+    return analyzed
+      .map((s) => toShotInput(s, labels.get(s.training_session_id)))
+      .filter((s): s is ShotInput => s !== null)
+  }, [analyzed, data.sessions])
+
   return (
     <>
       <FilterBar
@@ -156,7 +173,13 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
         onToggleClub={toggleClub}
         metric={metric}
         onMetricChange={setMetric}
+        onOpen3D={() => setViz3DOpen(true)}
       />
+      {viz3DOpen && (
+        <Suspense fallback={<div className="viz3d-overlay panel-center">Loading 3D view…</div>}>
+          <ShotViz3D shots={shots3D} onClose={() => setViz3DOpen(false)} />
+        </Suspense>
+      )}
       <StatTiles shots={analyzed} />
       <TrendCard
         shots={clubFiltered}

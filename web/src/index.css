@@ -593,3 +593,69 @@ button {
   font-size: 12.5px;
   padding-top: 18px;
 }
+
+/* 3D shot view overlay (golf-shot-viz). Keeps its own dark stage in
+   both themes, like a lightbox. */
+.viz3d-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #0b0e14;
+  color: #dbe4ee;
+}
+
+.viz3d-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+}
+
+.viz3d-count {
+  color: #8b98a9;
+  font-weight: 400;
+  margin-left: 10px;
+}
+
+.viz3d-stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.viz3d-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px 14px;
+}
+
+.viz3d-overlay button,
+.viz3d-overlay select {
+  background: #161c26;
+  color: #dbe4ee;
+  border: 1px solid #2a3546;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.viz3d-overlay button:hover,
+.viz3d-overlay select:hover {
+  border-color: #3d4d64;
+}
+
+.viz3d-overlay button[aria-pressed='true'] {
+  background: #2a4365;
+  border-color: #3f6499;
+}
+
+.viz3d-hint {
+  color: #66748a;
+  font-size: 12px;
+  margin-left: auto;
+}
