@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "echarts": "^6.1.0",
-    "golf-shot-viz": "^0.1.0",
+    "golf-shot-viz": "^0.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "three": "^0.185.1"
