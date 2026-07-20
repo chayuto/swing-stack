@@ -312,6 +312,33 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
       ]
     })
 
+    // Flat dashed segment per session at that session's mean, so each
+    // session reads as one step against the rolling line.
+    const sessionAvgSeries = clubs.map((c) => {
+      const bySession = new Map<string, SeqShot[]>()
+      for (const p of c.points) {
+        if (p.shot.excluded) continue
+        const list = bySession.get(p.shot.training_session_id) ?? []
+        list.push(p)
+        bySession.set(p.shot.training_session_id, list)
+      }
+      const data: (number[] | null)[] = []
+      for (const points of bySession.values()) {
+        if (points.length < MIN_SAMPLES) continue
+        const { mean } = meanSd(points.map((q) => q.v))
+        const xs = points.map((q) => q.x)
+        data.push([Math.min(...xs) - 0.5, mean], [Math.max(...xs) + 0.5, mean], null)
+      }
+      return {
+        type: 'line' as const,
+        data,
+        lineStyle: { color: c.color, width: 1.5, type: 'dashed' as const, opacity: 0.6 },
+        symbol: 'none',
+        silent: true,
+        z: 2,
+      }
+    })
+
     const dotSeries = clubs.map((c) => ({
       type: 'scatter' as const,
       symbolSize: 8,
@@ -442,6 +469,7 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
             : undefined,
         },
         ...bandSeries,
+        ...sessionAvgSeries,
         ...dotSeries,
         ...lineSeries,
       ],
@@ -462,7 +490,7 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
           <h2>Progress</h2>
           <p className="subtitle" data-testid="trend-hint">
             {metric.hint} All sessions, oldest to newest. Lines are rolling {WINDOW}-shot averages
-            per club{clubs.length === 1 ? ', the band is ±1σ' : ''}.
+            per club, dashes are session averages{clubs.length === 1 ? ', the band is ±1σ' : ''}.
           </p>
         </div>
         <select
