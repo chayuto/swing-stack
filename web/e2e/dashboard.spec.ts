@@ -90,6 +90,14 @@ test('progress card shows a per-club legend for several clubs', async ({ page })
   await expect(page.getByTestId('trend-legend')).toBeVisible()
 })
 
+test('session trends card renders all four panels with headline numbers', async ({ page }) => {
+  await expect(page.getByTestId('session-trends')).toBeVisible()
+  for (const key of ['carry', 'face', 'mishit', 'smash']) {
+    await expect(page.getByTestId(`session-trend-${key}`).locator('canvas')).toBeVisible()
+    await expect(page.getByTestId(`session-trend-${key}-latest`)).not.toBeEmpty()
+  }
+})
+
 test('shot shape chart renders', async ({ page }) => {
   await expect(page.getByTestId('shot-shape-chart')).toBeVisible()
   await expect(page.getByTestId('shot-shape-chart').locator('canvas')).toBeVisible()
@@ -99,17 +107,19 @@ test('excluding a shot drops it from stats and restores on second click', async 
   const shotsTile = page.getByTestId('stat-shots').getByTestId('stat-value')
   const before = Number(await shotsTile.innerText())
   const dot = page.getByTestId('fan-dot').first()
+  // The owner may have excluded shots of their own, so count relative.
+  const hollow = page.locator('[data-testid="fan-dot"][data-excluded]')
+  const hollowBefore = await hollow.count()
 
   // Exclude: the dot stays plotted but hollow, and the count drops.
   await dot.click()
-  const hollow = page.locator('[data-testid="fan-dot"][data-excluded]')
-  await expect(hollow).toHaveCount(1)
+  await expect(hollow).toHaveCount(hollowBefore + 1)
   await expect(page.getByTestId('excluded-note')).toBeVisible()
   await expect(shotsTile).toHaveText(String(before - 1))
 
   // Restore, so the suite leaves the seeded data untouched.
-  await hollow.click()
-  await expect(page.locator('[data-testid="fan-dot"][data-excluded]')).toHaveCount(0)
+  await dot.click()
+  await expect(hollow).toHaveCount(hollowBefore)
   await expect(shotsTile).toHaveText(String(before))
 })
 

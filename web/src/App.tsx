@@ -13,6 +13,7 @@ import { TrajectoryChart } from './components/TrajectoryChart'
 import { GappingChart } from './components/GappingChart'
 import { ShotShapeChart } from './components/ShotShapeChart'
 import { TrendCard } from './components/TrendCard'
+import { SessionTrendsCard } from './components/SessionTrendsCard'
 import { ClubTable } from './components/ClubTable'
 import { LoginPanel } from './components/LoginPanel'
 import { toShotInput } from './api/toShotInput'
@@ -187,6 +188,12 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
         selectedSessionId={sessionId}
         mode={mode}
         onToggle={onToggleShot}
+      />
+      <SessionTrendsCard
+        shots={clubFiltered}
+        sessions={data.sessions}
+        selectedSessionId={sessionId}
+        mode={mode}
       />
       <div className="dashboard-grid">
         <section className="card" aria-label="Shot dispersion">
