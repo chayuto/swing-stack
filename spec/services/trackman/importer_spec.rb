@@ -85,6 +85,61 @@ RSpec.describe Trackman::Importer do
       .and not_change { user.clubs.count }
   end
 
+  it "dates a session by the local day, not the exported UTC day" do
+    payload = trackman_payload.deep_dup
+    group = payload["StrokeGroups"][0]
+    group["Date"] = "2026-07-27" # what TrackMan exports: the UTC day
+    group["Strokes"].each_with_index do |stroke, i|
+      stroke["Time"] = "2026-07-27T#{format('%02d', 22 + (i / 30))}:#{format('%02d', i % 30)}:00+00:00"
+    end
+
+    described_class.new(user: user, payload: payload).call
+
+    # 22:00 UTC on the 27th is 08:00 on the 28th in Sydney.
+    expect(user.training_sessions.sole.played_on).to eq(Date.new(2026, 7, 28))
+  end
+
+  it "keeps the starting date when a session runs past UTC midnight" do
+    payload = trackman_payload.deep_dup
+    first = payload["StrokeGroups"][0]
+    late = first["Strokes"].pop(2)
+    first["Date"] = "2026-07-29"
+    first["Strokes"].each_with_index { |s, i| s["Time"] = "2026-07-29T23:#{format('%02d', i % 60)}:00+00:00" }
+    # TrackMan splits the group at UTC midnight; both halves share one id.
+    late.each_with_index { |s, i| s["Time"] = "2026-07-30T00:0#{i}:00+00:00" }
+    payload["StrokeGroups"] << first.merge("Date" => "2026-07-30", "Strokes" => late)
+
+    result = described_class.new(user: user, payload: payload).call
+
+    expect(result.sessions_count).to eq(1) # two exported groups, one session
+    session = user.training_sessions.sole # merged onto one record by shared id
+    expect(session.shots.count).to eq(52)
+    # The whole block is the morning of the 30th in Sydney.
+    expect(session.played_on).to eq(Date.new(2026, 7, 30))
+  end
+
+  it "leaves a deleted session deleted when replaying a stored payload" do
+    import
+    user.training_sessions.sole.destroy!
+
+    result = described_class.new(user: user, payload: trackman_payload, update_only: true).call
+
+    expect(result).to have_attributes(sessions_count: 0, shots_count: 0)
+    expect(user.training_sessions.count).to eq(0)
+    expect(user.shots.count).to eq(0)
+  end
+
+  it "still refreshes sessions that exist when replaying a stored payload" do
+    import
+    session = user.training_sessions.sole
+    session.update!(played_on: Date.new(2000, 1, 1))
+
+    result = described_class.new(user: user, payload: trackman_payload, update_only: true).call
+
+    expect(result.shots_count).to eq(52)
+    expect(session.reload.played_on).to eq(Date.new(2026, 7, 19))
+  end
+
   it "rejects payloads that are not TrackMan reports" do
     expect { described_class.new(user: user, payload: { "foo" => "bar" }).call }
       .to raise_error(Trackman::ReportParser::Error, /no StrokeGroups/)

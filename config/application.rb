@@ -33,7 +33,10 @@ module SwingStack
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # config.time_zone = "Central Time (US & Canada)"
+    # The player is in Sydney. TrackMan exports timestamps in UTC, so a
+    # morning range session lands on the previous UTC day. Sessions are
+    # dated by local day, not UTC day. Timestamps stay UTC in the database.
+    config.time_zone = "Australia/Sydney"
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Only loads a smaller set of middleware suitable for API only apps.
