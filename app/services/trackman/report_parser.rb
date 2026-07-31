@@ -63,7 +63,7 @@ module Trackman
         session: {
           external_id: group["Id"] || @payload["Id"],
           source: "trackman",
-          played_on: group["Date"],
+          played_on: group_played_on(group),
           facility: report_group_name { |kind| kind.start_with?("Facility") || kind == "Location" },
           bay: report_group_name { |kind| kind == "Bay" },
           ball_type: group["Ball"],
@@ -74,6 +74,17 @@ module Trackman
         },
         shots: Array(group["Strokes"]).map { |stroke| parse_stroke(stroke, group_club: group["Club"]) }
       }
+    end
+
+    # The export's "Date" is the UTC day. A session played in the morning
+    # in Sydney is the previous day in UTC, so read the date off the first
+    # stroke in the player's zone instead. Empty groups keep the export
+    # value because there is nothing better to use.
+    def group_played_on(group)
+      first = Array(group["Strokes"]).filter_map { |stroke| stroke["Time"] }.min
+      return group["Date"] if first.blank?
+
+      Time.zone.parse(first).to_date
     end
 
     def parse_stroke(stroke, group_club: nil)

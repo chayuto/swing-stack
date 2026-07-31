@@ -25,7 +25,7 @@ namespace :trackman do
 
     batches.each do |batch|
       result = PaperTrail.request(whodunnit: "import_batch:#{batch.id}") do
-        Trackman::Importer.new(user: user, payload: batch.raw_payload).call
+        Trackman::Importer.new(user: user, payload: batch.raw_payload, update_only: true).call
       end
       puts "#{batch.filename || batch.id}: #{result.shots_count} shot(s) revisited"
     end
