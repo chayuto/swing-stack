@@ -24,6 +24,8 @@ export interface TrainingSession {
   bay: string | null
   ball_type: string | null
   temperature: number | null
+  /** Degrees added to direction metrics to correct a misaimed bay target line */
+  calibration_offset_deg: number | null
   created_at: string
   shots_count: number
 }

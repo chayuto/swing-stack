@@ -5,41 +5,63 @@ module Api
     class StatsController < BaseController
       before_action -> { authenticate_actor!(scope: "telemetry:read") }
 
-      AGGREGATES = <<~SQL.squish.freeze
-        clubs.id   AS club_id,
-        clubs.label AS club_label,
-        clubs.static_loft_deg,
-        COUNT(shots.id)               AS shots_count,
-        AVG(shots.club_speed)         AS avg_club_speed,
-        AVG(shots.ball_speed)         AS avg_ball_speed,
-        AVG(shots.smash_factor)       AS avg_smash_factor,
-        AVG(shots.launch_angle)       AS avg_launch_angle,
-        AVG(shots.spin_rate)          AS avg_spin_rate,
-        AVG(shots.max_height)         AS avg_max_height,
-        AVG(shots.carry)              AS avg_carry,
-        STDDEV_SAMP(shots.carry)      AS sd_carry,
-        MIN(shots.carry)              AS min_carry,
-        MAX(shots.carry)              AS max_carry,
-        AVG(shots.total_distance)     AS avg_total_distance,
-        STDDEV_SAMP(shots.carry_side) AS sd_carry_side,
-        AVG(shots.attack_angle)       AS avg_attack_angle,
-        AVG(shots.club_path)          AS avg_club_path,
-        STDDEV_SAMP(shots.club_path)  AS sd_club_path,
-        AVG(shots.face_angle)         AS avg_face_angle,
-        STDDEV_SAMP(shots.face_angle) AS sd_face_angle,
-        AVG(shots.face_to_path)       AS avg_face_to_path,
-        STDDEV_SAMP(shots.face_to_path) AS sd_face_to_path
-      SQL
+      # Direction metrics are measured against the bay's target line.
+      # With calibrated=1, each session's calibration_offset_deg is added
+      # at query time (lateral distances rotate by the same angle).
+      # face_to_path is a difference of two directions, so the offset
+      # cancels and it is never corrected. Stored telemetry is untouched.
+      def self.aggregates(face:, path:, side:)
+        <<~SQL.squish.freeze
+          clubs.id   AS club_id,
+          clubs.label AS club_label,
+          clubs.static_loft_deg,
+          COUNT(shots.id)               AS shots_count,
+          AVG(shots.club_speed)         AS avg_club_speed,
+          AVG(shots.ball_speed)         AS avg_ball_speed,
+          AVG(shots.smash_factor)       AS avg_smash_factor,
+          AVG(shots.launch_angle)       AS avg_launch_angle,
+          AVG(shots.spin_rate)          AS avg_spin_rate,
+          AVG(shots.max_height)         AS avg_max_height,
+          AVG(shots.carry)              AS avg_carry,
+          STDDEV_SAMP(shots.carry)      AS sd_carry,
+          MIN(shots.carry)              AS min_carry,
+          MAX(shots.carry)              AS max_carry,
+          AVG(shots.total_distance)     AS avg_total_distance,
+          STDDEV_SAMP(#{side})          AS sd_carry_side,
+          AVG(shots.attack_angle)       AS avg_attack_angle,
+          AVG(#{path})                  AS avg_club_path,
+          STDDEV_SAMP(#{path})          AS sd_club_path,
+          AVG(#{face})                  AS avg_face_angle,
+          STDDEV_SAMP(#{face})          AS sd_face_angle,
+          AVG(shots.face_to_path)       AS avg_face_to_path,
+          STDDEV_SAMP(shots.face_to_path) AS sd_face_to_path
+        SQL
+      end
+
+      OFFSET_SQL = "COALESCE(training_sessions.calibration_offset_deg, 0)".freeze
+
+      AGGREGATES = aggregates(
+        face: "shots.face_angle",
+        path: "shots.club_path",
+        side: "shots.carry_side"
+      )
+
+      CALIBRATED_AGGREGATES = aggregates(
+        face: "(shots.face_angle + #{OFFSET_SQL})",
+        path: "(shots.club_path + #{OFFSET_SQL})",
+        side: "(shots.carry_side + shots.carry * SIN(RADIANS(#{OFFSET_SQL})))"
+      )
 
       def clubs
         shots = Shot.for_user(current_user).analyzed
         shots = shots.where(training_session_id: params[:session_id]) if params[:session_id].present?
         shots = shots.where(carry: params[:min_carry].to_f..) if params[:min_carry].present?
 
+        aggregates = params[:calibrated] == "1" ? CALIBRATED_AGGREGATES : AGGREGATES
         rows = shots.joins(:club)
                     .group("clubs.id", "clubs.label", "clubs.static_loft_deg")
                     .order("clubs.static_loft_deg")
-                    .select(AGGREGATES)
+                    .select(aggregates)
 
         render json: rows.map { |row| serialize(row) }
       end

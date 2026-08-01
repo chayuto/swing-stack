@@ -169,6 +169,33 @@ button {
   gap: 6px;
 }
 
+.calibration-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.calibration-editor input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  width: 5em;
+}
+
+.calibration-editor button:disabled {
+  opacity: 0.5;
+}
+
+.filter-bar button[aria-pressed='true'].ghost-btn {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
 .chip {
   display: inline-flex;
   align-items: center;

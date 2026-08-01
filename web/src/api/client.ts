@@ -160,8 +160,14 @@ async function allShots(): Promise<Shot[]> {
 export const api = {
   sessions: () => apiGet<TrainingSession[]>('/sessions'),
   clubs: () => apiGet<Club[]>('/clubs'),
-  clubStats: () => apiGet<ClubStats[]>('/stats/clubs'),
+  clubStats: (calibrated = false) =>
+    apiGet<ClubStats[]>(`/stats/clubs${calibrated ? '?calibrated=1' : ''}`),
   shots: allShots,
   setShotExcluded: (id: string, excluded: boolean) =>
     apiFetch<Shot>(`/shots/${id}`, { method: 'PATCH', body: JSON.stringify({ excluded }) }),
+  setSessionCalibration: (id: string, offsetDeg: number | null) =>
+    apiFetch<TrainingSession>(`/sessions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ calibration_offset_deg: offsetDeg }),
+    }),
 }

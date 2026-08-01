@@ -17,6 +17,7 @@ import { SessionTrendsCard } from './components/SessionTrendsCard'
 import { ClubTable } from './components/ClubTable'
 import { LoginPanel } from './components/LoginPanel'
 import { toShotInput } from './api/toShotInput'
+import { calibrateShot, offsetsBySession } from './calibration'
 import type { ShotInput } from 'golf-shot-viz'
 
 // three.js only loads when someone opens the 3D view.
@@ -59,9 +60,19 @@ interface DashboardProps {
   data: DashboardData
   mode: Mode
   onToggleShot: (id: string, excluded: boolean) => void
+  calibrated: boolean
+  onToggleCalibrated: () => void
+  onSetCalibration: (id: string, offsetDeg: number | null) => void
 }
 
-function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
+function Dashboard({
+  data,
+  mode,
+  onToggleShot,
+  calibrated,
+  onToggleCalibrated,
+  onSetCalibration,
+}: DashboardProps) {
   const [sessionId, setSessionId] = useState('all')
   const [activeClubs, setActiveClubs] = useState<Set<string> | null>(null)
   const [metric, setMetric] = useState<'carry' | 'total'>('carry')
@@ -79,14 +90,22 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
     return { ordered, colorOf }
   }, [data.clubs, mode])
 
+  // The calibration layer: pure math over the raw shots the API served.
+  // Nothing is refetched when the toggle flips.
+  const shots = useMemo(() => {
+    if (!calibrated) return data.shots
+    const offsets = offsetsBySession(data.sessions)
+    return data.shots.map((s) => calibrateShot(s, offsets.get(s.training_session_id)))
+  }, [calibrated, data.shots, data.sessions])
+
   const enriched = useMemo<FanShot[]>(
     () =>
-      data.shots.map((s) => ({
+      shots.map((s) => ({
         ...s,
         color: palette.colorOf(s.club?.id ?? null),
         clubLabel: s.club?.label ?? 'Unclassified',
       })),
-    [data.shots, palette],
+    [shots, palette],
   )
 
   const chips = useMemo<ClubChip[]>(() => {
@@ -175,6 +194,9 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
         metric={metric}
         onMetricChange={setMetric}
         onOpen3D={() => setViz3DOpen(true)}
+        calibrated={calibrated}
+        onToggleCalibrated={onToggleCalibrated}
+        onSetCalibration={onSetCalibration}
       />
       {viz3DOpen && (
         <Suspense fallback={<div className="viz3d-overlay panel-center">Loading 3D view…</div>}>
@@ -200,6 +222,7 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
           <h2>Dispersion</h2>
           <p className="subtitle">
             Top-down view from the tee. Dashed ellipses are 1σ per club.
+            {calibrated && <span data-testid="calibrated-note"> Bay-calibrated view.</span>}
             {excludedCount > 0 && (
               <span className="excluded-note" data-testid="excluded-note">
                 {' '}{excludedCount} excluded (hollow dots). Click one to restore it.
@@ -235,6 +258,7 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
         <h2>Shot shape</h2>
         <p className="subtitle">
           Face angle vs club path at impact. Click a dot to exclude a mishit from every stat.
+          {calibrated && ' Bay-calibrated view.'}
         </p>
         <div className="shape-chart">
           <ShotShapeChart shots={filtered} mode={mode} onToggle={onToggleShot} />
@@ -242,7 +266,10 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
       </section>
       <section className="card table-card" aria-label="Club averages">
         <h2>Club averages</h2>
-        <p className="subtitle">All sessions, aggregated in PostgreSQL via /api/v1/stats/clubs.</p>
+        <p className="subtitle">
+          All sessions, aggregated in PostgreSQL via /api/v1/stats/clubs.
+          {calibrated && ' Bay-calibrated view.'}
+        </p>
         <ClubTable stats={data.stats} colorOf={palette.colorOf} />
       </section>
     </>
@@ -251,7 +278,8 @@ function Dashboard({ data, mode, onToggleShot }: DashboardProps) {
 
 export default function App() {
   const [mode, themePref, cycleTheme] = useThemeMode()
-  const { state, submitLogin, signOut, setExcluded } = useDashboardData()
+  const { state, submitLogin, signOut, setExcluded, calibrated, toggleCalibrated, setSessionCalibration } =
+    useDashboardData()
 
   return (
     <>
@@ -295,7 +323,14 @@ export default function App() {
         </div>
       )}
       {state.phase === 'ready' && (
-        <Dashboard data={state.data} mode={mode} onToggleShot={setExcluded} />
+        <Dashboard
+          data={state.data}
+          mode={mode}
+          onToggleShot={setExcluded}
+          calibrated={calibrated}
+          onToggleCalibrated={toggleCalibrated}
+          onSetCalibration={setSessionCalibration}
+        />
       )}
 
       <footer className="app-footer">
