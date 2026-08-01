@@ -487,6 +487,30 @@ button {
   border-radius: 50%;
 }
 
+.session-legend .entry {
+  padding: 2px 7px;
+  margin: -2px -3px;
+  border-radius: 8px;
+  cursor: default;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+.session-legend .entry:not(.glyph-entry):hover {
+  background: var(--chip-bg, rgb(127 127 127 / 0.12));
+}
+
+.session-legend .entry.dim {
+  opacity: 0.35;
+}
+
+.session-legend .glyph-entry {
+  color: var(--muted);
+}
+
+.session-legend .glyph {
+  font-size: 10px;
+}
+
 .viz-tooltip {
   position: absolute;
   pointer-events: none;

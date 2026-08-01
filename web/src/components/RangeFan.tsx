@@ -2,11 +2,17 @@ import { useMemo, useState } from 'react'
 import type { Shot } from '../api/types'
 import type { Mode } from '../theme'
 import { hexToRgba, INK } from '../theme'
+import type { SessionSlot } from '../sessionGroups'
+import { covEllipse, ellipsePoints, fullSwings, GROUP_MIN } from '../sessionGroups'
 
 // Top-down driving range view. Equal metres-per-pixel on both axes, so
 // the distance arcs are true circles around the tee. SVG rather than a
 // chart library: the fan geometry (arcs, tee, sigma ellipses) is easier
 // to own directly.
+//
+// With session grouping on, dots and ellipses take the session ramp
+// colour, ellipses split per session-club group, and hovering a dot or
+// a legend entry dims every other session.
 
 export interface FanShot extends Shot {
   color: string
@@ -18,6 +24,9 @@ interface Props {
   metric: 'carry' | 'total'
   mode: Mode
   onToggle: (id: string, excluded: boolean) => void
+  /** Session ramp slots; null renders the classic by-club view */
+  sessionSlots: Map<string, SessionSlot> | null
+  hoverSessionId: string | null
 }
 
 const W = 480
@@ -45,9 +54,17 @@ function sideLabel(v: number): string {
 
 const kmh = (mps: number) => Math.round(mps * 3.6)
 
-export function RangeFan({ shots, metric, mode, onToggle }: Props) {
+export function RangeFan({ shots, metric, mode, onToggle, sessionSlots, hoverSessionId }: Props) {
   const ink = INK[mode]
   const [hover, setHover] = useState<Hover | null>(null)
+
+  // Session to isolate: the legend hover wins, then a hovered dot's own
+  // session. Only meaningful with session grouping on.
+  const hlSession = sessionSlots
+    ? (hoverSessionId ?? hover?.shot.training_session_id ?? null)
+    : null
+  const colorOf = (s: FanShot) =>
+    sessionSlots ? (sessionSlots.get(s.training_session_id)?.color ?? s.color) : s.color
 
   const plotted = useMemo(
     () => shots.filter((s) => dist(s, metric) !== null && side(s, metric) !== null),
@@ -63,28 +80,35 @@ export function RangeFan({ shots, metric, mode, onToggle }: Props) {
     return { maxDist, scale, tee, toXY }
   }, [plotted, metric])
 
-  // Per-club 1-sigma dispersion ellipses (5+ shots). Unclassified
+  // 1-sigma dispersion ellipses (GROUP_MIN+ shots): per club, or per
+  // session-club group when session grouping is on. Unclassified
   // strokes (chips, mishits) get dots but no ellipse: they are not one
   // club, so their sigma is meaningless and the ellipse dwarfs the fan.
   const ellipses = useMemo(() => {
-    const byClub = new Map<string, FanShot[]>()
+    const groups = new Map<string, FanShot[]>()
     for (const s of plotted) {
       if (!s.club || s.excluded) continue
-      byClub.set(s.club.id, [ ...(byClub.get(s.club.id) ?? []), s ])
+      const key = sessionSlots ? `${s.training_session_id}:${s.club.id}` : s.club.id
+      groups.set(key, [ ...(groups.get(key) ?? []), s ])
     }
-    return [ ...byClub.values() ]
-      .filter((group) => group.length >= 5)
-      .map((group) => {
-        const xs = group.map((s) => side(s, metric)!)
-        const ys = group.map((s) => dist(s, metric)!)
-        const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length
-        const sd = (v: number[], m: number) =>
-          Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1))
-        const mx = mean(xs)
-        const my = mean(ys)
-        return { mx, my, sx: sd(xs, mx), sy: sd(ys, my), color: group[0].color }
-      })
-  }, [plotted, metric])
+    return [ ...groups.values() ]
+      // Fit on full swings only: drills and chips keep their dots but
+      // would smear the ellipse across half the range.
+      .map((group) => fullSwings(group, (s) => dist(s, metric)))
+      .filter((group) => group.length >= GROUP_MIN)
+      .map((group) => ({
+        ellipse: covEllipse(
+          group.map((s) => side(s, metric)!),
+          group.map((s) => dist(s, metric)!),
+          2,
+          2,
+        ),
+        color: sessionSlots
+          ? (sessionSlots.get(group[0].training_session_id)?.color ?? group[0].color)
+          : group[0].color,
+        sessionId: sessionSlots ? group[0].training_session_id : null,
+      }))
+  }, [plotted, metric, sessionSlots])
 
   const arcs = []
   for (let d = 25; d <= geo.maxDist; d += 25) arcs.push(d)
@@ -111,19 +135,24 @@ export function RangeFan({ shots, metric, mode, onToggle }: Props) {
             strokeWidth={1}
             strokeDasharray="3 5"
           />
-          {ellipses.map((e, i) => (
-            <ellipse
-              key={i}
-              cx={geo.tee.x + e.mx * geo.scale}
-              cy={geo.tee.y - e.my * geo.scale}
-              rx={Math.max(e.sx * geo.scale, 4)}
-              ry={Math.max(e.sy * geo.scale, 4)}
-              fill={hexToRgba(e.color, 0.09)}
-              stroke={hexToRgba(e.color, 0.55)}
-              strokeWidth={1}
-              strokeDasharray="4 4"
-            />
-          ))}
+          {ellipses.map((e, i) => {
+            const dim = hlSession !== null && e.sessionId !== hlSession
+            const focus = hlSession !== null && e.sessionId === hlSession
+            const points = ellipsePoints(e.ellipse)
+              .map(([x, y]) => `${(geo.tee.x + x * geo.scale).toFixed(1)},${(geo.tee.y - y * geo.scale).toFixed(1)}`)
+              .join(' ')
+            return (
+              <polygon
+                key={i}
+                points={points}
+                fill={hexToRgba(e.color, dim ? 0.02 : focus ? 0.13 : 0.09)}
+                stroke={hexToRgba(e.color, dim ? 0.12 : focus ? 0.85 : 0.55)}
+                strokeWidth={focus ? 1.8 : 1}
+                strokeDasharray="4 4"
+                strokeLinejoin="round"
+              />
+            )
+          })}
         </g>
 
         {arcs.map((d) => (
@@ -150,6 +179,8 @@ export function RangeFan({ shots, metric, mode, onToggle }: Props) {
         {plotted.map((s) => {
           const p = geo.toXY(s)
           const active = hover?.shot.id === s.id
+          const dim = hlSession !== null && s.training_session_id !== hlSession
+          const fill = colorOf(s)
           return (
             <circle
               key={s.id}
@@ -160,10 +191,10 @@ export function RangeFan({ shots, metric, mode, onToggle }: Props) {
               cx={p.x}
               cy={p.y}
               r={active ? 6.5 : 4.4}
-              fill={s.excluded ? ink.surface : s.color}
-              stroke={s.excluded ? s.color : ink.surface}
+              fill={s.excluded ? ink.surface : fill}
+              stroke={s.excluded ? fill : ink.surface}
               strokeWidth={1.4}
-              opacity={s.excluded ? 0.55 : 1}
+              opacity={dim ? 0.12 : s.excluded ? 0.55 : 1}
               onMouseEnter={() => setHover({ shot: s, x: p.x, y: p.y })}
               onMouseLeave={() => setHover(null)}
               onClick={() => onToggle(s.id, !s.excluded)}
@@ -179,8 +210,11 @@ export function RangeFan({ shots, metric, mode, onToggle }: Props) {
           style={{ left: `${(hover.x / W) * 100}%`, top: `${(hover.y / H) * 100}%` }}
         >
           <div className="head">
-            <span className="dot" style={{ background: hover.shot.color }} />
+            <span className="dot" style={{ background: colorOf(hover.shot) }} />
             {hover.shot.clubLabel}
+            {sessionSlots?.get(hover.shot.training_session_id) && (
+              <> · {sessionSlots.get(hover.shot.training_session_id)!.label}</>
+            )}
             {hover.shot.excluded && <span className="flag"> excluded</span>}
           </div>
           {hover.shot.carry !== null && (

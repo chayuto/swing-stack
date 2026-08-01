@@ -17,6 +17,8 @@ interface Props {
   onToggleClub: (key: string) => void
   metric: 'carry' | 'total'
   onMetricChange: (m: 'carry' | 'total') => void
+  grouping: 'club' | 'session'
+  onGroupingChange: (g: 'club' | 'session') => void
   onOpen3D: () => void
   calibrated: boolean
   onToggleCalibrated: () => void
@@ -81,6 +83,8 @@ export function FilterBar({
   onToggleClub,
   metric,
   onMetricChange,
+  grouping,
+  onGroupingChange,
   onOpen3D,
   calibrated,
   onToggleCalibrated,
@@ -125,6 +129,19 @@ export function FilterBar({
         </button>
         <button data-testid="metric-total" aria-pressed={metric === 'total'} onClick={() => onMetricChange('total')}>
           Total
+        </button>
+      </div>
+
+      <div className="segmented" role="group" aria-label="Colour dots by" title="Colour dots by club or by session date">
+        <button data-testid="group-by-club" aria-pressed={grouping === 'club'} onClick={() => onGroupingChange('club')}>
+          By club
+        </button>
+        <button
+          data-testid="group-by-session"
+          aria-pressed={grouping === 'session'}
+          onClick={() => onGroupingChange('session')}
+        >
+          By session
         </button>
       </div>
 
