@@ -58,6 +58,36 @@ RSpec.describe "Stats", type: :request do
       expect(wedge["shots_count"]).to eq(7)
     end
 
+    it "applies the session calibration offset when calibrated=1" do
+      user.training_sessions.sole.update!(calibration_offset_deg: 2.8)
+
+      get "/api/v1/stats/clubs", headers: api_key_headers(user, scopes: %w[telemetry:read])
+      raw = response.parsed_body.find { |r| r.dig("club", "static_loft_deg").to_f == 31.0 }
+
+      get "/api/v1/stats/clubs", params: { calibrated: "1" },
+                                 headers: api_key_headers(user, scopes: %w[telemetry:read])
+      calibrated = response.parsed_body.find { |r| r.dig("club", "static_loft_deg").to_f == 31.0 }
+
+      expect(calibrated.dig("averages", "face_angle"))
+        .to be_within(0.11).of(raw.dig("averages", "face_angle") + 2.8)
+      expect(calibrated.dig("averages", "club_path"))
+        .to be_within(0.11).of(raw.dig("averages", "club_path") + 2.8)
+      # A difference of two directions: the offset cancels.
+      expect(calibrated.dig("averages", "face_to_path")).to eq(raw.dig("averages", "face_to_path"))
+      # A constant shift never changes a spread.
+      expect(calibrated.dig("dispersion", "face_angle_sd")).to eq(raw.dig("dispersion", "face_angle_sd"))
+    end
+
+    it "returns raw aggregates when no offset is stored, calibrated or not" do
+      get "/api/v1/stats/clubs", headers: api_key_headers(user, scopes: %w[telemetry:read])
+      raw = response.parsed_body
+
+      get "/api/v1/stats/clubs", params: { calibrated: "1" },
+                                 headers: api_key_headers(user, scopes: %w[telemetry:read])
+
+      expect(response.parsed_body).to eq(raw)
+    end
+
     it "does not leak other users' telemetry" do
       stranger = create(:user)
       get "/api/v1/stats/clubs", headers: api_key_headers(stranger, scopes: %w[telemetry:read])

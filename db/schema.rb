@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_20_040000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_01_050000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -130,6 +130,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_20_040000) do
   create_table "training_sessions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "ball_type"
     t.string "bay"
+    t.float "calibration_offset_deg"
     t.string "client_name"
     t.datetime "created_at", null: false
     t.string "external_id", null: false

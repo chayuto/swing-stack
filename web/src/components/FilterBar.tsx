@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { TrainingSession } from '../api/types'
 
 export interface ClubChip {
@@ -17,6 +18,9 @@ interface Props {
   metric: 'carry' | 'total'
   onMetricChange: (m: 'carry' | 'total') => void
   onOpen3D: () => void
+  calibrated: boolean
+  onToggleCalibrated: () => void
+  onSetCalibration: (id: string, offsetDeg: number | null) => void
 }
 
 function sessionName(s: TrainingSession): string {
@@ -24,6 +28,48 @@ function sessionName(s: TrainingSession): string {
     ? new Date(`${s.played_on}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
     : s.external_id.slice(0, 8)
   return s.facility ? `${date} · ${s.facility}` : date
+}
+
+// Editor for the selected session's bay target-line correction. The
+// value is stored on the session; telemetry itself is never rewritten.
+function CalibrationEditor({
+  session,
+  onSetCalibration,
+}: {
+  session: TrainingSession
+  onSetCalibration: (id: string, offsetDeg: number | null) => void
+}) {
+  const stored = session.calibration_offset_deg
+  const [draft, setDraft] = useState(stored?.toString() ?? '')
+  useEffect(() => setDraft(stored?.toString() ?? ''), [session.id, stored])
+
+  const parsed = draft.trim() === '' ? null : Number(draft)
+  const valid = parsed === null || (Number.isFinite(parsed) && Math.abs(parsed) <= 15)
+  const dirty = parsed !== stored && !(parsed === null && stored === null)
+
+  return (
+    <span className="calibration-editor">
+      <label htmlFor="calibration-offset">Bay offset°</label>
+      <input
+        id="calibration-offset"
+        data-testid="calibration-offset-input"
+        type="number"
+        step="0.1"
+        min="-15"
+        max="15"
+        placeholder="none"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <button
+        className="ghost-btn"
+        disabled={!valid || !dirty}
+        onClick={() => onSetCalibration(session.id, parsed)}
+      >
+        Save
+      </button>
+    </span>
+  )
 }
 
 export function FilterBar({
@@ -36,7 +82,11 @@ export function FilterBar({
   metric,
   onMetricChange,
   onOpen3D,
+  calibrated,
+  onToggleCalibrated,
+  onSetCalibration,
 }: Props) {
+  const selected = sessions.find((s) => s.id === sessionId)
   return (
     <div className="filter-bar" data-testid="filter-bar">
       <select
@@ -77,6 +127,18 @@ export function FilterBar({
           Total
         </button>
       </div>
+
+      <button
+        className="ghost-btn"
+        data-testid="calibration-toggle"
+        aria-pressed={calibrated}
+        title="Correct direction metrics for each session's bay target-line offset"
+        onClick={onToggleCalibrated}
+      >
+        Bay cal. {calibrated ? 'on' : 'off'}
+      </button>
+
+      {selected && <CalibrationEditor session={selected} onSetCalibration={onSetCalibration} />}
 
       <button className="ghost-btn open-3d" data-testid="open-3d" onClick={onOpen3D}>
         3D view

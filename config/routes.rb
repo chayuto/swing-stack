@@ -14,7 +14,7 @@ Rails.application.routes.draw do
 
       # Telemetry pipeline
       resources :imports, only: %i[create index show]
-      resources :sessions, only: %i[index show], controller: :training_sessions
+      resources :sessions, only: %i[index show update], controller: :training_sessions
       resources :shots, only: %i[index update]
       resources :clubs, only: %i[index update]
 

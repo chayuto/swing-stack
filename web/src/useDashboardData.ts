@@ -17,6 +17,7 @@ export type DashboardState =
 
 export function useDashboardData() {
   const [state, setState] = useState<DashboardState>({ phase: 'loading' })
+  const [calibrated, setCalibrated] = useState(false)
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
@@ -74,14 +75,63 @@ export function useDashboardData() {
     patch(excluded)
     void api
       .setShotExcluded(id, excluded)
-      .then(() => api.clubStats())
+      .then(() => api.clubStats(calibrated))
       .then((stats) =>
         setState((prev) =>
           prev.phase === 'ready' ? { ...prev, data: { ...prev.data, stats } } : prev,
         ),
       )
       .catch(() => patch(!excluded))
+  }, [calibrated])
+
+  const refreshStats = useCallback((useCalibrated: boolean) => {
+    void api.clubStats(useCalibrated).then((stats) =>
+      setState((prev) =>
+        prev.phase === 'ready' ? { ...prev, data: { ...prev.data, stats } } : prev,
+      ),
+    )
   }, [])
 
-  return { state, submitLogin, signOut, setExcluded, reload: load }
+  // The toggle never refetches shots: per-shot correction is pure math
+  // done client-side. Only the SQL club aggregates need a round trip.
+  const toggleCalibrated = useCallback(() => {
+    setCalibrated((prev) => {
+      refreshStats(!prev)
+      return !prev
+    })
+  }, [refreshStats])
+
+  const setSessionCalibration = useCallback(
+    async (id: string, offsetDeg: number | null) => {
+      const updated = await api.setSessionCalibration(id, offsetDeg)
+      setState((prev) =>
+        prev.phase === 'ready'
+          ? {
+              ...prev,
+              data: {
+                ...prev.data,
+                sessions: prev.data.sessions.map((s) =>
+                  s.id === id
+                    ? { ...s, calibration_offset_deg: updated.calibration_offset_deg }
+                    : s,
+                ),
+              },
+            }
+          : prev,
+      )
+      refreshStats(calibrated)
+    },
+    [calibrated, refreshStats],
+  )
+
+  return {
+    state,
+    submitLogin,
+    signOut,
+    setExcluded,
+    reload: load,
+    calibrated,
+    toggleCalibrated,
+    setSessionCalibration,
+  }
 }
