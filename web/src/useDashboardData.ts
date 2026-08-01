@@ -19,7 +19,10 @@ export function useDashboardData() {
   const [state, setState] = useState<DashboardState>({ phase: 'loading' })
   const [calibrated, setCalibrated] = useState(false)
 
-  const load = useCallback(async () => {
+  // A cancelled load must not touch state: StrictMode mounts the
+  // effect twice, and the abandoned first fetch would otherwise land
+  // late and overwrite edits made after the visible load finished.
+  const load = useCallback(async (signal?: { cancelled: boolean }) => {
     setState({ phase: 'loading' })
     try {
       await ensureSession()
@@ -29,15 +32,21 @@ export function useDashboardData() {
         api.clubStats(),
         api.shots(),
       ])
+      if (signal?.cancelled) return
       setState({ phase: 'ready', data: { sessions, clubs, stats, shots } })
     } catch (err) {
+      if (signal?.cancelled) return
       if (err instanceof AuthRequiredError) setState({ phase: 'login', error: null })
       else setState({ phase: 'error', message: err instanceof Error ? err.message : String(err) })
     }
   }, [])
 
   useEffect(() => {
-    void load()
+    const signal = { cancelled: false }
+    void load(signal)
+    return () => {
+      signal.cancelled = true
+    }
   }, [load])
 
   const submitLogin = useCallback(
@@ -73,15 +82,21 @@ export function useDashboardData() {
           : prev,
       )
     patch(excluded)
-    void api
-      .setShotExcluded(id, excluded)
-      .then(() => api.clubStats(calibrated))
-      .then((stats) =>
-        setState((prev) =>
-          prev.phase === 'ready' ? { ...prev, data: { ...prev.data, stats } } : prev,
-        ),
-      )
-      .catch(() => patch(!excluded))
+    void api.setShotExcluded(id, excluded).then(
+      // Stats refresh is best effort: the flag is already persisted, so
+      // a failed refetch must not revert the dot.
+      async () => {
+        try {
+          const stats = await api.clubStats(calibrated)
+          setState((prev) =>
+            prev.phase === 'ready' ? { ...prev, data: { ...prev.data, stats } } : prev,
+          )
+        } catch {
+          /* keep the previous aggregates */
+        }
+      },
+      () => patch(!excluded),
+    )
   }, [calibrated])
 
   const refreshStats = useCallback((useCalibrated: boolean) => {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { currentUser } from './api/client'
 import type { Mode } from './theme'
 import { slotColor } from './theme'
@@ -16,8 +16,10 @@ import { TrendCard } from './components/TrendCard'
 import { SessionTrendsCard } from './components/SessionTrendsCard'
 import { ClubTable } from './components/ClubTable'
 import { LoginPanel } from './components/LoginPanel'
+import { SessionLegend } from './components/SessionLegend'
 import { toShotInput } from './api/toShotInput'
 import { calibrateShot, offsetsBySession } from './calibration'
+import { clubGlyph, clubSymbol, sessionSlots } from './sessionGroups'
 import type { ShotInput } from 'golf-shot-viz'
 
 // three.js only loads when someone opens the 3D view.
@@ -76,6 +78,8 @@ function Dashboard({
   const [sessionId, setSessionId] = useState('all')
   const [activeClubs, setActiveClubs] = useState<Set<string> | null>(null)
   const [metric, setMetric] = useState<'carry' | 'total'>('carry')
+  const [grouping, setGrouping] = useState<'club' | 'session'>('club')
+  const [hoverSessionId, setHoverSessionId] = useState<string | null>(null)
   const [viz3DOpen, setViz3DOpen] = useState(false)
 
   // Fixed slot assignment from the full club list (ordered by loft), so
@@ -85,10 +89,16 @@ function Dashboard({
       (a, b) => Number(a.static_loft_deg) - Number(b.static_loft_deg),
     )
     const slots = new Map(ordered.map((c, i) => [ c.id, i ]))
-    const colorOf = (clubId: string | null) =>
-      slotColor(clubId !== null ? (slots.get(clubId) ?? null) : null, mode)
-    return { ordered, colorOf }
+    const slotOf = (clubId: string | null) =>
+      clubId !== null ? (slots.get(clubId) ?? null) : null
+    const colorOf = (clubId: string | null) => slotColor(slotOf(clubId), mode)
+    return { ordered, colorOf, slotOf }
   }, [data.clubs, mode])
+
+  // Session grouping: ramp colours over every session, oldest to
+  // newest, so progression reads as a colour sweep in the charts.
+  const groupBySession = grouping === 'session'
+  const slots = useMemo(() => sessionSlots(data.sessions, mode), [data.sessions, mode])
 
   // The calibration layer: pure math over the raw shots the API served.
   // Nothing is refetched when the toggle flips.
@@ -135,6 +145,37 @@ function Dashboard({
     return entries
   }, [enriched, palette, sessionId])
 
+  // Session comparison is one club at a time: mixing Driver and 7 Iron
+  // dots under session colours reads as noise. Switching to By session
+  // narrows to the busiest club; switching back restores the previous
+  // selection unless the user changed clubs in between.
+  const savedClubs = useRef<{ prev: Set<string> | null; auto: Set<string> | null } | null>(null)
+  const changeGrouping = useCallback(
+    (g: 'club' | 'session') => {
+      if (g === grouping) return
+      if (g === 'session') {
+        const busiest = chips.reduce<ClubChip | null>(
+          (a, b) => (a === null || b.count > a.count ? b : a),
+          null,
+        )
+        const auto = busiest && chips.length > 1 ? new Set([busiest.key]) : null
+        savedClubs.current = { prev: activeClubs, auto }
+        if (auto) setActiveClubs(auto)
+      } else if (savedClubs.current) {
+        const { prev, auto } = savedClubs.current
+        const untouched =
+          auto === null ||
+          (activeClubs !== null &&
+            activeClubs.size === auto.size &&
+            [...auto].every((k) => activeClubs.has(k)))
+        if (untouched) setActiveClubs(prev)
+        savedClubs.current = null
+      }
+      setGrouping(g)
+    },
+    [grouping, chips, activeClubs],
+  )
+
   const toggleClub = useCallback(
     (key: string) => {
       setActiveClubs((prev) => {
@@ -168,6 +209,32 @@ function Dashboard({
     [enriched, activeClubs],
   )
 
+  // Sessions present in the current filter, in ramp order, for the
+  // interactive legends under the session-grouped charts.
+  const visibleSlots = useMemo(() => {
+    const ids = new Set(filtered.map((s) => s.training_session_id))
+    return [...slots.values()].filter((s) => ids.has(s.id)).sort((a, b) => a.index - b.index)
+  }, [filtered, slots])
+
+  const clubGlyphs = useMemo(
+    () =>
+      chips
+        .filter((c) => activeClubs === null || activeClubs.has(c.key))
+        .map((c) => ({
+          glyph: clubGlyph(c.key === UNCLASSIFIED_KEY ? null : palette.slotOf(c.key)),
+          label: c.label,
+        })),
+    [chips, activeClubs, palette],
+  )
+
+  // Club symbols matter only when two clubs share a session-coloured
+  // chart; a single club reads best as plain dots.
+  const multiClub = clubGlyphs.length > 1
+  const symbolOf = useCallback(
+    (clubId: string | null) => (multiClub ? clubSymbol(palette.slotOf(clubId)) : 'circle'),
+    [multiClub, palette],
+  )
+
   // Excluded shots stay visible (hollow dots) so they can be restored,
   // but every stat and aggregate chart ignores them.
   const analyzed = useMemo(() => filtered.filter((s) => !s.excluded), [filtered])
@@ -193,6 +260,8 @@ function Dashboard({
         onToggleClub={toggleClub}
         metric={metric}
         onMetricChange={setMetric}
+        grouping={grouping}
+        onGroupingChange={changeGrouping}
         onOpen3D={() => setViz3DOpen(true)}
         calibrated={calibrated}
         onToggleCalibrated={onToggleCalibrated}
@@ -221,7 +290,8 @@ function Dashboard({
         <section className="card" aria-label="Shot dispersion">
           <h2>Dispersion</h2>
           <p className="subtitle">
-            Top-down view from the tee. Dashed ellipses are 1σ per club.
+            Top-down view from the tee. Dashed ellipses are 2σ of full swings per{' '}
+            {groupBySession ? 'session. Hover a dot or a date to isolate a session.' : 'club.'}
             {calibrated && <span data-testid="calibrated-note"> Bay-calibrated view.</span>}
             {excludedCount > 0 && (
               <span className="excluded-note" data-testid="excluded-note">
@@ -229,17 +299,33 @@ function Dashboard({
               </span>
             )}
           </p>
-          <RangeFan shots={filtered} metric={metric} mode={mode} onToggle={onToggleShot} />
-          <div className="fan-legend" data-testid="fan-legend">
-            {chips
-              .filter((c) => activeClubs === null || activeClubs.has(c.key))
-              .map((c) => (
-                <span className="entry" key={c.key}>
-                  <span className="dot" style={{ background: c.color }} />
-                  {c.label}
-                </span>
-              ))}
-          </div>
+          <RangeFan
+            shots={filtered}
+            metric={metric}
+            mode={mode}
+            onToggle={onToggleShot}
+            sessionSlots={groupBySession ? slots : null}
+            hoverSessionId={hoverSessionId}
+          />
+          {groupBySession ? (
+            <SessionLegend
+              slots={visibleSlots}
+              hovered={hoverSessionId}
+              onHover={setHoverSessionId}
+              testId="fan-session-legend"
+            />
+          ) : (
+            <div className="fan-legend" data-testid="fan-legend">
+              {chips
+                .filter((c) => activeClubs === null || activeClubs.has(c.key))
+                .map((c) => (
+                  <span className="entry" key={c.key}>
+                    <span className="dot" style={{ background: c.color }} />
+                    {c.label}
+                  </span>
+                ))}
+            </div>
+          )}
         </section>
         <div className="right-col">
           <section className="card" aria-label="Ball flight">
@@ -258,11 +344,29 @@ function Dashboard({
         <h2>Shot shape</h2>
         <p className="subtitle">
           Face angle vs club path at impact. Click a dot to exclude a mishit from every stat.
+          {groupBySession &&
+            ' Ellipses are 2σ of full swings per session, the dashed trail links session means. Hover a dot or a date to isolate a session.'}
           {calibrated && ' Bay-calibrated view.'}
         </p>
         <div className="shape-chart">
-          <ShotShapeChart shots={filtered} mode={mode} onToggle={onToggleShot} />
+          <ShotShapeChart
+            shots={filtered}
+            mode={mode}
+            onToggle={onToggleShot}
+            sessionSlots={groupBySession ? slots : null}
+            hoverSessionId={hoverSessionId}
+            symbolOf={symbolOf}
+          />
         </div>
+        {groupBySession && (
+          <SessionLegend
+            slots={visibleSlots}
+            hovered={hoverSessionId}
+            onHover={setHoverSessionId}
+            testId="shape-session-legend"
+            extras={clubGlyphs.length > 1 ? clubGlyphs : undefined}
+          />
+        )}
       </section>
       <section className="card table-card" aria-label="Club averages">
         <h2>Club averages</h2>

@@ -312,8 +312,10 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
       ]
     })
 
-    // Flat dashed segment per session at that session's mean, so each
-    // session reads as one step against the rolling line.
+    // Flat dashed segment per session at that session's mean, with a
+    // faint mean ± 1σ box behind it, so each session reads as one step
+    // against the rolling line and the spread change is visible at a
+    // glance.
     const sessionAvgSeries = clubs.map((c) => {
       const bySession = new Map<string, SeqShot[]>()
       for (const p of c.points) {
@@ -323,11 +325,18 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
         bySession.set(p.shot.training_session_id, list)
       }
       const data: (number[] | null)[] = []
+      const sigmaBoxes: [{ xAxis: number; yAxis: number }, { xAxis: number; yAxis: number }][] = []
       for (const points of bySession.values()) {
         if (points.length < MIN_SAMPLES) continue
-        const { mean } = meanSd(points.map((q) => q.v))
+        const { mean, sd } = meanSd(points.map((q) => q.v))
         const xs = points.map((q) => q.x)
-        data.push([Math.min(...xs) - 0.5, mean], [Math.max(...xs) + 0.5, mean], null)
+        const from = Math.min(...xs) - 0.5
+        const to = Math.max(...xs) + 0.5
+        data.push([from, mean], [to, mean], null)
+        sigmaBoxes.push([
+          { xAxis: from, yAxis: mean - sd },
+          { xAxis: to, yAxis: mean + sd },
+        ])
       }
       return {
         type: 'line' as const,
@@ -335,6 +344,11 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
         lineStyle: { color: c.color, width: 1.5, type: 'dashed' as const, opacity: 0.6 },
         symbol: 'none',
         silent: true,
+        markArea: {
+          silent: true,
+          itemStyle: { color: hexToRgba(c.color, 0.07) },
+          data: sigmaBoxes,
+        },
         z: 2,
       }
     })
@@ -490,7 +504,8 @@ export function TrendCard({ shots, sessions, selectedSessionId, mode, onToggle }
           <h2>Progress</h2>
           <p className="subtitle" data-testid="trend-hint">
             {metric.hint} All sessions, oldest to newest. Lines are rolling {WINDOW}-shot averages
-            per club, dashes are session averages{clubs.length === 1 ? ', the band is ±1σ' : ''}.
+            per club, dashes and faint boxes are session mean ±1σ
+            {clubs.length === 1 ? ', the ribbon is rolling ±1σ' : ''}.
           </p>
         </div>
         <select

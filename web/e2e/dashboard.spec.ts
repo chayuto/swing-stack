@@ -106,8 +106,12 @@ test('shot shape chart renders', async ({ page }) => {
 test('excluding a shot drops it from stats and restores on second click', async ({ page }) => {
   const shotsTile = page.getByTestId('stat-shots').getByTestId('stat-value')
   const before = Number(await shotsTile.innerText())
-  const dot = page.getByTestId('fan-dot').first()
-  // The owner may have excluded shots of their own, so count relative.
+  // The owner may have excluded shots of their own, so count relative
+  // and pick a dot that is not already excluded. nth() keeps the same
+  // dot across re-renders, unlike a :not([data-excluded]) locator.
+  const dots = page.getByTestId('fan-dot')
+  const flags = await dots.evaluateAll((els) => els.map((el) => el.hasAttribute('data-excluded')))
+  const dot = dots.nth(flags.indexOf(false))
   const hollow = page.locator('[data-testid="fan-dot"][data-excluded]')
   const hollowBefore = await hollow.count()
 
@@ -121,6 +125,28 @@ test('excluding a shot drops it from stats and restores on second click', async 
   await dot.click()
   await expect(hollow).toHaveCount(hollowBefore)
   await expect(shotsTile).toHaveText(String(before))
+})
+
+test('session grouping recolours the charts and adds interactive legends', async ({ page }) => {
+  await page.getByTestId('group-by-session').click()
+  await expect(page.getByTestId('group-by-session')).toHaveAttribute('aria-pressed', 'true')
+
+  // Session legends replace or join the club legend.
+  await expect(page.getByTestId('fan-session-legend')).toBeVisible()
+  await expect(page.getByTestId('shape-session-legend')).toBeVisible()
+  expect(await page.getByTestId('fan-dot').count()).toBeGreaterThan(0)
+
+  // Hovering a session date dims every other session's dots.
+  const entries = page.getByTestId('fan-session-legend').locator('.entry')
+  if ((await entries.count()) >= 2) {
+    await entries.first().hover()
+    await expect(page.locator('[data-testid="fan-dot"][opacity="0.12"]').first()).toBeVisible()
+  }
+
+  // Back to club colours restores the club legend.
+  await page.getByTestId('group-by-club').click()
+  await expect(page.getByTestId('fan-legend')).toBeVisible()
+  await expect(page.getByTestId('fan-session-legend')).toHaveCount(0)
 })
 
 test('theme toggle stamps an explicit theme', async ({ page }) => {
