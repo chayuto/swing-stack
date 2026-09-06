@@ -32,6 +32,45 @@ else
 fi
 
 echo
+echo "=== toolchain (no Dependabot ecosystem watches these) ==="
+
+# The Ruby version is pinned in two files that must agree. Dependabot has no
+# ecosystem for .ruby-version, and pointing its docker ecosystem at the
+# Dockerfile would bump only that one and silently desync the pair. So check
+# both here instead.
+rv=$(tr -d '[:space:]' < .ruby-version 2>/dev/null)
+dv=$(sed -n 's/^ARG RUBY_VERSION=\(.*\)$/\1/p' Dockerfile 2>/dev/null | tr -d '[:space:]')
+
+if [ "$rv" = "$dv" ]; then
+  echo "ruby        pinned $rv (.ruby-version and Dockerfile agree)"
+else
+  echo "!! ruby      .ruby-version=$rv but Dockerfile=$dv. These must match."
+fi
+
+series=$(printf '%s' "$rv" | cut -d. -f1,2)
+latest=$(curl -s --max-time 10 https://endoflife.date/api/ruby.json 2>/dev/null \
+  | python3 -c "
+import sys,json
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+s='$series'
+for r in d:
+    if r.get('cycle')==s: print(r.get('latest','')); break
+" 2>/dev/null)
+
+if [ -n "$latest" ] && [ "$latest" != "$rv" ]; then
+  echo "            newer patch in the $series series: $latest"
+elif [ -n "$latest" ]; then
+  echo "            newest patch in the $series series"
+fi
+
+# Rails is a normal gem, so Dependabot does propose it, but the Gemfile pin
+# caps which releases it can ever offer. Show both so the cap stays visible.
+rails_lock=$(sed -n 's/^    rails (\(.*\))$/\1/p' Gemfile.lock | head -1)
+rails_pin=$(sed -n 's/^gem "rails", "\(.*\)"$/\1/p' Gemfile | head -1)
+echo "rails       locked $rails_lock (Gemfile allows $rails_pin)"
+
+echo
 echo "=== open Dependabot PRs ==="
 
 prs=$(gh pr list --state open --limit 50 \
