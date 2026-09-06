@@ -43,5 +43,10 @@ module SwingStack
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # No model attaches files and there are no active_storage_* tables, so
+    # nothing generates variants. Disabling the processor stops Active Storage
+    # loading an image backend (and its libvips/ImageMagick system library).
+    config.active_storage.variant_processor = :disabled
   end
 end

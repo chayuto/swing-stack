@@ -2,6 +2,8 @@
 require "rubygems"
 require "bundler/setup"
 
-ARGV.unshift("--ensure-latest")
+# No --ensure-latest here. Dependabot holds gem updates for 30 days
+# (.github/dependabot.yml), so the lock is deliberately behind the newest
+# release and the flag would fail CI on every brakeman publish.
 
 load Gem.bin_path("brakeman", "brakeman")
