@@ -64,6 +64,32 @@ npm run build
 E2E (`npx playwright test` from `web/`) needs a seeded dev database and does
 not run in CI, so it is not part of the gate.
 
+## The Ruby version drifts unwatched
+
+Ruby is pinned in two places that must always agree:
+
+- `.ruby-version`, which drives rbenv locally and `ruby/setup-ruby` in CI.
+- `ARG RUBY_VERSION` in the `Dockerfile`.
+
+**No Dependabot ecosystem watches either one.** The config covers `bundler`,
+`npm` and `github-actions` only, so Ruby ages silently until someone looks.
+`scripts/triage.sh` checks it on every run: it compares the two pins against
+each other and the pinned version against the newest patch in its series.
+
+Do not try to fix this by pointing Dependabot's `docker` ecosystem at the
+Dockerfile. It would bump `ARG RUBY_VERSION` and leave `.ruby-version`
+behind, which produces a routine looking PR that quietly breaks the pair.
+Move both files together, by hand, in one commit.
+
+A patch bump inside the same series (3.3.10 to 3.3.12) is routine: change the
+two pins, `bundle install`, run the suite. A major Ruby upgrade is not
+maintenance work and deserves its own pass.
+
+Rails is an ordinary gem, so Dependabot does propose it, but the Gemfile pin
+caps what it can ever offer. `gem "rails", "~> 8.1.3"` means 8.1.x only, so
+no 8.2 or 9.0 PR will ever appear. Widening that pin is a deliberate decision,
+not something to do while triaging.
+
 ## Judging a Dependabot PR
 
 Dependabot holds every gem and npm update for 30 days before proposing it
