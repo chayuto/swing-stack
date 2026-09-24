@@ -13,7 +13,7 @@ module Api
       end
 
       rescue_from ActiveRecord::RecordInvalid do |e|
-        render json: { error: "validation_failed", details: e.record.errors.full_messages }, status: :unprocessable_entity
+        render json: { error: "validation_failed", details: e.record.errors.full_messages }, status: :unprocessable_content
       end
 
       private

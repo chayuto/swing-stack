@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import * as echarts from 'echarts/core'
 import { LineChart, ScatterChart, CustomChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, GraphicComponent } from 'echarts/components'
@@ -33,7 +33,10 @@ export function EChart({ option, height, testId, onClick }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<echarts.EChartsType | null>(null)
   const clickRef = useRef(onClick)
-  clickRef.current = onClick
+  // Keep the latest handler without re-binding the chart listener.
+  useLayoutEffect(() => {
+    clickRef.current = onClick
+  })
 
   useEffect(() => {
     const host = hostRef.current!
