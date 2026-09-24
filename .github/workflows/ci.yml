@@ -5,9 +5,19 @@ on:
   push:
     branches: [ main ]
 
+# CI only reads the repo. Keep the token read-only.
+permissions:
+  contents: read
+
+# A new push to a PR branch makes the older run pointless. Main keeps every run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   scan_ruby:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -20,12 +30,15 @@ jobs:
 
       - name: Scan for common Rails security vulnerabilities using static analysis
         run: bin/brakeman --no-pager
-      
+
+      # Run even when brakeman fails, so a brakeman finding cannot hide a CVE.
       - name: Scan for known security vulnerabilities in gems used
+        if: ${{ !cancelled() }}
         run: bin/bundler-audit
-      
+
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       RUBOCOP_CACHE_ROOT: tmp/rubocop
     steps:
@@ -52,6 +65,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -98,6 +112,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     defaults:
       run:

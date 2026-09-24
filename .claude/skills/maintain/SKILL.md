@@ -169,10 +169,10 @@ is what you want for a PR that needed manual work.
 
 ## Security findings
 
-`scan_ruby` runs `bin/brakeman` and then `bin/bundler-audit`, in that order,
-in one job. **A brakeman failure means bundler-audit never ran.** CVEs can
-therefore hide behind an unrelated brakeman failure for as long as it lasts.
-After fixing anything in `scan_ruby`, expect bundler-audit to have a backlog.
+`scan_ruby` runs `bin/brakeman` and then `bin/bundler-audit` in one job. The
+audit step has `if: ${{ !cancelled() }}`, so it runs even when brakeman fails.
+Read both step results in a red `scan_ruby`, not just the first one. Do not
+remove that condition: without it a brakeman failure hides every new CVE.
 
 Fix a bundler-audit finding with a targeted update, not a blanket one:
 
