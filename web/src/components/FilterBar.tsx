@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { TrainingSession } from '../api/types'
 
 export interface ClubChip {
@@ -34,6 +34,8 @@ function sessionName(s: TrainingSession): string {
 
 // Editor for the selected session's bay target-line correction. The
 // value is stored on the session; telemetry itself is never rewritten.
+// The parent keys it by session and stored value, so a new session or a
+// saved value remounts it with a fresh draft.
 function CalibrationEditor({
   session,
   onSetCalibration,
@@ -43,7 +45,6 @@ function CalibrationEditor({
 }) {
   const stored = session.calibration_offset_deg
   const [draft, setDraft] = useState(stored?.toString() ?? '')
-  useEffect(() => setDraft(stored?.toString() ?? ''), [session.id, stored])
 
   const parsed = draft.trim() === '' ? null : Number(draft)
   const valid = parsed === null || (Number.isFinite(parsed) && Math.abs(parsed) <= 15)
@@ -155,7 +156,13 @@ export function FilterBar({
         Bay cal. {calibrated ? 'on' : 'off'}
       </button>
 
-      {selected && <CalibrationEditor session={selected} onSetCalibration={onSetCalibration} />}
+      {selected && (
+        <CalibrationEditor
+          key={`${selected.id}:${selected.calibration_offset_deg ?? ''}`}
+          session={selected}
+          onSetCalibration={onSetCalibration}
+        />
+      )}
 
       <button className="ghost-btn open-3d" data-testid="open-3d" onClick={onOpen3D}>
         3D view

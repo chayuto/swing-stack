@@ -15,6 +15,24 @@ export type DashboardState =
   | { phase: 'error'; message: string }
   | { phase: 'ready'; data: DashboardData }
 
+// Loads everything the dashboard needs and returns the next state.
+// It never throws: auth and network failures become states too.
+async function fetchDashboard(): Promise<DashboardState> {
+  try {
+    await ensureSession()
+    const [sessions, clubs, stats, shots] = await Promise.all([
+      api.sessions(),
+      api.clubs(),
+      api.clubStats(),
+      api.shots(),
+    ])
+    return { phase: 'ready', data: { sessions, clubs, stats, shots } }
+  } catch (err) {
+    if (err instanceof AuthRequiredError) return { phase: 'login', error: null }
+    return { phase: 'error', message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function useDashboardData() {
   const [state, setState] = useState<DashboardState>({ phase: 'loading' })
   const [calibrated, setCalibrated] = useState(false)
@@ -22,44 +40,26 @@ export function useDashboardData() {
   // A cancelled load must not touch state: StrictMode mounts the
   // effect twice, and the abandoned first fetch would otherwise land
   // late and overwrite edits made after the visible load finished.
-  const load = useCallback(async (signal?: { cancelled: boolean }) => {
-    setState({ phase: 'loading' })
-    try {
-      await ensureSession()
-      const [sessions, clubs, stats, shots] = await Promise.all([
-        api.sessions(),
-        api.clubs(),
-        api.clubStats(),
-        api.shots(),
-      ])
-      if (signal?.cancelled) return
-      setState({ phase: 'ready', data: { sessions, clubs, stats, shots } })
-    } catch (err) {
-      if (signal?.cancelled) return
-      if (err instanceof AuthRequiredError) setState({ phase: 'login', error: null })
-      else setState({ phase: 'error', message: err instanceof Error ? err.message : String(err) })
+  useEffect(() => {
+    let cancelled = false
+    void fetchDashboard().then((next) => {
+      if (!cancelled) setState(next)
+    })
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  useEffect(() => {
-    const signal = { cancelled: false }
-    void load(signal)
-    return () => {
-      signal.cancelled = true
+  const submitLogin = useCallback(async (email: string, password: string) => {
+    try {
+      await login(email, password)
+    } catch (err) {
+      setState({ phase: 'login', error: err instanceof Error ? err.message : String(err) })
+      return
     }
-  }, [load])
-
-  const submitLogin = useCallback(
-    async (email: string, password: string) => {
-      try {
-        await login(email, password)
-        await load()
-      } catch (err) {
-        setState({ phase: 'login', error: err instanceof Error ? err.message : String(err) })
-      }
-    },
-    [load],
-  )
+    setState({ phase: 'loading' })
+    setState(await fetchDashboard())
+  }, [])
 
   const signOut = useCallback(() => {
     logout()
@@ -109,12 +109,13 @@ export function useDashboardData() {
 
   // The toggle never refetches shots: per-shot correction is pure math
   // done client-side. Only the SQL club aggregates need a round trip.
+  // Fetch outside the state updater: updaters must stay pure, and
+  // StrictMode runs them twice.
   const toggleCalibrated = useCallback(() => {
-    setCalibrated((prev) => {
-      refreshStats(!prev)
-      return !prev
-    })
-  }, [refreshStats])
+    const next = !calibrated
+    setCalibrated(next)
+    refreshStats(next)
+  }, [calibrated, refreshStats])
 
   const setSessionCalibration = useCallback(
     async (id: string, offsetDeg: number | null) => {
@@ -144,7 +145,6 @@ export function useDashboardData() {
     submitLogin,
     signOut,
     setExcluded,
-    reload: load,
     calibrated,
     toggleCalibrated,
     setSessionCalibration,

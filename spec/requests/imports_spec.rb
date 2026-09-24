@@ -43,7 +43,7 @@ RSpec.describe "Imports", type: :request do
 
     it "rejects non-JSON bodies" do
       post "/api/v1/imports", params: "not json", headers: jwt_headers(user).merge(json_headers)
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "marks the batch failed when the payload is not a TrackMan report" do

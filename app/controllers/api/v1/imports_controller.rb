@@ -9,7 +9,7 @@ module Api
 
       def create
         payload = parse_body
-        return render json: { error: "invalid_payload", details: "expected a TrackMan report JSON object" }, status: :unprocessable_entity unless payload.is_a?(Hash)
+        return render json: { error: "invalid_payload", details: "expected a TrackMan report JSON object" }, status: :unprocessable_content unless payload.is_a?(Hash)
 
         batch = current_user.import_batches.create!(raw_payload: payload, source: "trackman")
         TrackmanImportJob.perform_later(batch.id)

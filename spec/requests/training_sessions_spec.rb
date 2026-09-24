@@ -45,7 +45,7 @@ RSpec.describe "Training sessions", type: :request do
       patch "/api/v1/sessions/#{session.id}", params: { calibration_offset_deg: 45 },
                                               headers: jwt_headers(user)
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(session.reload.calibration_offset_deg).to be_nil
     end
 
