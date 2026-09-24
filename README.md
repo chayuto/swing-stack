@@ -152,3 +152,7 @@ so they never leave your machine. The test fixture is sanitized.
 
 Personal project and portfolio piece. I use it for my own range sessions.
 Bug reports are welcome. Feature requests may not be implemented.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
