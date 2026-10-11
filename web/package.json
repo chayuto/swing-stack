@@ -16,7 +16,7 @@
     "golf-shot-viz": "^0.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "three": "^0.185.1"
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
